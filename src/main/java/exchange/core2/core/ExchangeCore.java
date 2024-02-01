@@ -70,7 +70,8 @@ public final class ExchangeCore {
 
     /**
      * Exchange core constructor.
-     *  @param resultsConsumer       - custom consumer of processed commands
+     *
+     * @param resultsConsumer       - custom consumer of processed commands
      * @param exchangeConfiguration - exchange configuration
      */
     @Builder
@@ -126,9 +127,11 @@ public final class ExchangeCore {
         disruptor.setDefaultExceptionHandler(exceptionHandler);
 
         // advice completable future to use the same CPU socket as disruptor
+        // excutor_service dùng để chạy các matching_engine và risk_engine lên
         final ExecutorService loaderExecutor = Executors.newFixedThreadPool(matchingEnginesNum + riskEnginesNum, threadFactory);
 
         // start creating matching engines
+        // tạo các matching_engine với số lượng "matchingEnginesNum"
         final Map<Integer, CompletableFuture<MatchingEngineRouter>> matchingEngineFutures = IntStream.range(0, matchingEnginesNum)
                 .boxed()
                 .collect(Collectors.toMap(
@@ -140,6 +143,7 @@ public final class ExchangeCore {
         // TODO create processors in same thread we will execute it??
 
         // start creating risk engines
+        // tạo các risk_engine với số lượng "riskEnginesNum"
         final Map<Integer, CompletableFuture<RiskEngine>> riskEngineFutures = IntStream.range(0, riskEnginesNum)
                 .boxed()
                 .collect(Collectors.toMap(
@@ -148,11 +152,13 @@ public final class ExchangeCore {
                                 () -> new RiskEngine(shardId, riskEnginesNum, serializationProcessor, sharedPool, exchangeConfiguration),
                                 loaderExecutor)));
 
+        // tạo các matching_engine_handler từ function "MatchingEngineRouter.processOrder"
         final EventHandler<OrderCommand>[] matchingEngineHandlers = matchingEngineFutures.values().stream()
-                .map(CompletableFuture::join)
+                .map(CompletableFuture::join)   //
                 .map(mer -> (EventHandler<OrderCommand>) (cmd, seq, eob) -> mer.processOrder(seq, cmd))
                 .toArray(ExchangeCore::newEventHandlersArray);
 
+        // lấy tất cả các risk engine đã được khởi tạo
         final Map<Integer, RiskEngine> riskEngines = riskEngineFutures.entrySet().stream()
                 .collect(Collectors.toMap(
                         Map.Entry::getKey,
@@ -164,7 +170,8 @@ public final class ExchangeCore {
 
         // 1. grouping processor (G)
         final EventHandlerGroup<OrderCommand> afterGrouping =
-                disruptor.handleEventsWith((rb, bs) -> new GroupingProcessor(rb, rb.newBarrier(bs), perfCfg, coreWaitStrategy, sharedPool));
+                disruptor.handleEventsWith(
+                        (ringBuffer, sequences) -> new GroupingProcessor(ringBuffer, ringBuffer.newBarrier(sequences), perfCfg, coreWaitStrategy, sharedPool));
 
         // 2. [journaling (J)] in parallel with risk hold (R1) + matching engine (ME)
 

@@ -24,6 +24,9 @@ import lombok.RequiredArgsConstructor;
 
 import java.util.function.Supplier;
 
+/**
+ * Trả về các chiến lược của Disruptor
+ */
 @RequiredArgsConstructor
 public enum CoreWaitStrategy {
 

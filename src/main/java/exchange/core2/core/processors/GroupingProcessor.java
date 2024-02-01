@@ -30,9 +30,9 @@ import static exchange.core2.core.ExchangeCore.EVENTS_POOLING;
 
 @Slf4j
 public final class GroupingProcessor implements EventProcessor {
-    private static final int IDLE = 0;
-    private static final int HALTED = IDLE + 1;
-    private static final int RUNNING = HALTED + 1;
+    private static final int IDLE = 0;      // trạng thái nhàn rỗi
+    private static final int HALTED = IDLE + 1;     // trạng thái đã dừng
+    private static final int RUNNING = HALTED + 1;      // trạng thái đang chạy
 
     private static final int GROUP_SPIN_LIMIT = 1000;
 
@@ -43,6 +43,8 @@ public final class GroupingProcessor implements EventProcessor {
     private final RingBuffer<OrderCommand> ringBuffer;
     private final SequenceBarrier sequenceBarrier;
     private final WaitSpinningHelper waitSpinningHelper;
+
+    // để quản lý số thứ tự của cái gì đó (#desc)
     private final Sequence sequence = new Sequence(Sequencer.INITIAL_CURSOR_VALUE);
 
     private final SharedPool sharedPool;
@@ -68,6 +70,7 @@ public final class GroupingProcessor implements EventProcessor {
         this.sharedPool = sharedPool;
     }
 
+    // lấy số thứ tự #desc
     @Override
     public Sequence getSequence() {
         return sequence;
@@ -93,18 +96,22 @@ public final class GroupingProcessor implements EventProcessor {
     @Override
     public void run() {
         if (running.compareAndSet(IDLE, RUNNING)) {
+            // nếu processor đang ở trạng thái IDLE thì chuyển sang RUNNING
             sequenceBarrier.clearAlert();
             try {
                 if (running.get() == RUNNING) {
+                    // xử lý các công việc
                     processEvents();
                 }
             } finally {
+                // xử lý xong công việc thì lại chuyển về IDLE
                 running.set(IDLE);
             }
         } else {
             // This is a little bit of guess work.  The running state could of changed to HALTED by
             // this point.  However, Java does not have compareAndExchange which is the only way
             // to get it exactly correct.
+            // nếu đang chạy rồi thì throw exception
             if (running.get() == RUNNING) {
                 throw new IllegalStateException("Thread is already running");
             }

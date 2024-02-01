@@ -29,37 +29,39 @@ import java.util.Objects;
 // TODO REDUCE needs remaining size (can write into size), bidderHoldPrice - can write into price
 // TODO REJECT needs remaining size (can not write into size),
 
+/**
+ * #desc
+ */
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
 public final class MatcherTradeEvent {
 
-    public MatcherEventType eventType; // TRADE, REDUCE, REJECT (rare) or BINARY_EVENT (reports data)
+    public MatcherEventType eventType;  // TRADE, REDUCE, REJECT (rare) or BINARY_EVENT (reports data)
 
+    // #desc ko hiểu biến section này làm cái gì nữa
     public int section;
 
     // TODO join (requires 11+ bits)
-    // false, except when activeOrder is completely filled, removed or rejected
-    // it is always true for REJECT event
-    // it is true for REDUCE event if reduce was triggered by COMMAND
+    // = false trừ khi activeOrder (khớp hoàn toàn / bị remove / bị reject)
+    // = true nếu REJECT event
+    // = true trong trường hợp REDUCE event nếu reduce được gọi bởi COMMAND
     public boolean activeOrderCompleted;
 
     // maker (for TRADE event type only)
     public long matchedOrderId;
     public long matchedOrderUid; // 0 for rejection
-    public boolean matchedOrderCompleted; // false, except when matchedOrder is completely filled
+    public boolean matchedOrderCompleted; // = false, trừ khi matchedOrder khớp hoàn toàn
 
-    // actual price of the deal (from maker order), 0 for rejection (price can be take from original order)
+    // giá thực tế của giao dịch (from maker order), "0" for rejection (giá có thể được lấy từ original order)
     public long price;
 
     // TRADE - trade size
-    // REDUCE - effective reduce size of REDUCE command, or not filled size for CANCEL command
-    // REJECT - unmatched size of rejected order
+    // REDUCE - (khối lượng bị giảm của REDUCE command) or (khối lượng chưa khớp với CANCEL command)
+    // REJECT - khối lượng chưa khớp của rejected order
     public long size;
 
-    //public long timestamp; // same as activeOrder related event timestamp
-
-    // frozen price from BID order owner (depends on activeOrderAction)
+    // giá cố định từ BID order owner (depends on activeOrderAction)
     public long bidderHoldPrice;
 
     // reference to next event in chain
@@ -91,6 +93,8 @@ public final class MatcherTradeEvent {
         return tail;
     }
 
+
+    // lấy số lượng các step đã đi của Order này
     public int getChainSize() {
         MatcherTradeEvent tail = this;
         int c = 1;
@@ -101,6 +105,8 @@ public final class MatcherTradeEvent {
         return c;
     }
 
+
+    // khởi tạo các step của 1 Order dựa trên số lượng step mong muốn
     @NotNull
     public static MatcherTradeEvent createEventChain(int chainLength) {
         final MatcherTradeEvent head = new MatcherTradeEvent();
@@ -124,6 +130,7 @@ public final class MatcherTradeEvent {
         return list;
     }
 
+
     /**
      * Compare next events chain as well.
      */
@@ -145,6 +152,7 @@ public final class MatcherTradeEvent {
                 && bidderHoldPrice == other.bidderHoldPrice
                 && ((nextEvent == null && other.nextEvent == null) || (nextEvent != null && nextEvent.equals(other.nextEvent)));
     }
+
 
     /**
      * Includes chaining events
@@ -175,9 +183,10 @@ public final class MatcherTradeEvent {
                 ", matchedOrderCompleted=" + matchedOrderCompleted +
                 ", price=" + price +
                 ", size=" + size +
-//                ", timestamp=" + timestamp +
                 ", bidderHoldPrice=" + bidderHoldPrice +
                 ", nextEvent=" + (nextEvent != null) +
                 '}';
     }
+
+
 }
