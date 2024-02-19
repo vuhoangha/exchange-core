@@ -190,6 +190,32 @@ public class Main {
   - [Java-instruction-reordering-cache-in-threads](https://stackoverflow.com/questions/14321212/java-instruction-reordering-cache-in-threads)
   - [A Faster Volatile](https://robsjava.blogspot.com/2013/06/a-faster-volatile.html?view=sidebar)
 
+##### ByteBuffer
+- Hàm 'Flip'
+```java
+// đặt lại position về 0 và set limit bằng với vị trí hiện tại của buffer
+// buffer sẵn sàng để dữ liệu được đọc từ đầu và đến đúng vị trí cuối cùng đã ghi.
+class Example {
+    public static void main() {
+        // Tạo một ByteBuffer với dung lượng 100
+        ByteBuffer buffer = ByteBuffer.allocate(100);
+        
+        // Ghi dữ liệu vào buffer
+        buffer.put((byte) 10);
+        buffer.put((byte) 20);
+        
+        // Vị trí (position) hiện tại là 2, giới hạn (limit) là 100
+        buffer.flip();
+        // sau khi call hàm trên --> position=0, limit=2
+    }
+}
+- ```
+
+##### HEAP trong Java Virtual Machine (JVM)
+- "heap" là vùng bộ nhớ được JVM sử dụng lưu trữ các đối tượng và các mảng được tạo ra bởi các chương trình Java khi chạy. Nó được quản lý bởi bộ thu gom rác (Garbage Collector - GC) của JVM.
+- JVM có 1 hoặc nhiều thuật toán để thu gom rác (Garbage Collection) để giải phóng các đối tượng ko sử dụng
+- Có thể cấu hình được heap size để phù hợp với từng chương trình
+
 ## [CHRONICLE WIRE](https://github.com/OpenHFT/Chronicle-Wire)
 - [Tài liệu 1](https://dzone.com/articles/high-performance-java-serialization-to-different-f)
 - [Tài liệu 2](https://dzone.com/articles/did-you-know-the-fastest-way-of-serializing-a-java)

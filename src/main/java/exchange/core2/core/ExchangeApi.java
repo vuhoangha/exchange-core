@@ -58,6 +58,8 @@ public final class ExchangeApi {
     // promises cache (TODO can be changed to queue)
     private final Map<Long, Consumer<OrderCommand>> promises = new ConcurrentHashMap<>();
 
+    // số lượng biến long cần thiết để lưu trữ 1 msg
+    // 5 biến long --> 5 * 8 * 8 = 320 bit
     public static final int LONGS_PER_MESSAGE = 5;
 
 
@@ -301,7 +303,9 @@ public final class ExchangeApi {
                                    final int transferId,
                                    final long timestamp,
                                    final LongConsumer endSeqConsumer) {
+        đang dở ở đây
 
+        // từ data đầu vào
         final long[] longsArrayData = SerializationUtils.bytesToLongArrayLz4(
                 lz4Compressor,
                 BinaryCommandsProcessor.serializeObject(data, dataTypeCode),

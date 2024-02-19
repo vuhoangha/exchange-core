@@ -23,6 +23,9 @@ import net.openhft.chronicle.bytes.WriteBytesMarshallable;
 
 import java.util.Objects;
 
+/**
+ * Mô tả thông tin về symbol
+ */
 @Builder
 @AllArgsConstructor
 @Getter

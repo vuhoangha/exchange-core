@@ -183,7 +183,14 @@ public final class BinaryCommandsProcessor implements WriteBytesMarshallable, St
         }
     }
 
+    /**
+     * Bọc lại dữ liệu bytes đầu vào và objectType trong 1 mảng bytes nữa để thuận tiện khi giải mã
+     */
     public static NativeBytes<Void> serializeObject(WriteBytesMarshallable data, int objectType) {
+        // allocateElasticDirect có thể cấp phát bộ nhớ động tùy thuộc kích cỡ dữ liệu
+        // ngoài ra ở đây sẽ cấp phát bộ nhớ trực tiếp, ko thuộc quản lý của JVM và GC
+        // hiệu suất sẽ tốt hơn và có thể mở rộng động
+        // bù lại sẽ cần control bộ nhớ cẩn thận vì JVM ko quản lý nên có nguy cơ rò rỉ bộ nhớ
         final NativeBytes<Void> bytes = Bytes.allocateElasticDirect(128);
         bytes.writeInt(objectType);
         data.writeMarshallable(bytes);

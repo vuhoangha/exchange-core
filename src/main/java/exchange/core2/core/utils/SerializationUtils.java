@@ -55,27 +55,35 @@ public final class SerializationUtils {
         return longs;
     }
 
+    /**
+     * Nén mảng bytes thành 1 mảng long sử dụng Lz4
+     * Mảng long đầu ra phải đáp ứng yêu cầu là chứa trọn vẹn dữ liệu mảng bytes và là bội số của "padding"
+     */
     public static long[] bytesToLongArrayLz4(final LZ4Compressor lz4Compressor, final NativeBytes<Void> bytes, final int padding) {
+        // lấy kích thước có thể đọc của mảng byte đầu vào
         int originalSize = (int) bytes.readRemaining();
 //        log.debug("COMPRESS originalSize={}", originalSize);
 
+        // tạo 1 ByteBuffer với size bằng bytes truyền vào
         final ByteBuffer byteBuffer = ByteBuffer.allocate(originalSize);
-
+        // convert bytes truyền vào qua bytes mới
         bytes.read(byteBuffer);
-
+        // đặt lại limit của bytes về đúng giá trị cuối cùng có thể --> đọc mảng bytes thuận tiện hơn
         byteBuffer.flip();
 
+        // Tạo ra 1 mảng byte chứa kết quả sau khi nén
+        // 4 byte đầu tiên chứa độ dài data
         final ByteBuffer byteBufferCompressed = ByteBuffer.allocate(4 + lz4Compressor.maxCompressedLength(originalSize));
         byteBufferCompressed.putInt(originalSize);// override with compressed length
         lz4Compressor.compress(byteBuffer, byteBufferCompressed);
-
+        // giảm limit của mảng byte về đúng limit thực tế
         byteBufferCompressed.flip();
 
         int compressedBytesLen = byteBufferCompressed.remaining();
 
         return toLongsArray(
-                byteBufferCompressed.array(),
-                byteBufferCompressed.arrayOffset(),
+                byteBufferCompressed.array(),       // các phần tử trong byte_buffer đổi thành array
+                byteBufferCompressed.arrayOffset(),     // lấy vị trí có giá trị đầu tiên trong mảng byte. Ví dụ mảng byte có 100 phần tử, nhưng từ phần tử thứ 2 trở đi mới có giá trị thì offset của nó = 2;
                 compressedBytesLen,
                 padding);
     }
@@ -93,19 +101,34 @@ public final class SerializationUtils {
         return longArray;
     }
 
+    /**
+     * Từ bytes[] đầu vào convert thành long[], với điều kiện độ dài mảng long phải chứa đủ mảng bytes và chia hết cho padding
+     */
     public static long[] toLongsArray(final byte[] bytes, final int offset, final int length, final int padding) {
-
+        // tính toán độ dài long array tối thiểu để chứa mảng bytes có độ dài "length" và phải chia hết cho "padding"
         final int longLength = requiredLongArraySize(length, padding);
+        // tạo 1 long array với độ dài tính toán phía trên
         long[] longArray = new long[longLength];
         //log.debug("byte[{}]={}", bytes.length, bytes);
+        // Tạo 1 ByteBuffer với độ dài x2 so với cần thiết (có vẻ để chống tràn bộ đệm nữa)
         final ByteBuffer allocate = ByteBuffer.allocate(longLength * 8 * 2);
         final LongBuffer longBuffer = allocate.asLongBuffer();
+        // ghi mảng bytes đầu vào vào ByteBuffer allocate
         allocate.put(bytes, offset, length);
+        // chuyển longBuffer sang longArray
         longBuffer.get(longArray);
         return longArray;
     }
 
 
+    /**
+     * Hàm này lấy kích cỡ của mảng long cần để chứa mảng bytes có "bytesLength" phần tử
+     * Kích cỡ mảng long đầu ra phải là bội số của "padding"
+     * Ví dụ bytesLength = 100;
+     *      requiredLongArraySize(100) = 13
+     *      rem = 13 % 4 = 1
+     *      len output = 13 + (4 - 1) = 16
+     */
     public static int requiredLongArraySize(final int bytesLength, final int padding) {
         int len = requiredLongArraySize(bytesLength);
         if (padding == 1) {
@@ -156,7 +179,13 @@ public final class SerializationUtils {
         return WireType.RAW.apply(bytes);
     }
 
-
+    /**
+     * Xác định chính xác số lượng phần tử tối thiểu trong long array để chứa hết mảng bytes có 'bytesLength' phần tử
+     * vì kiểu long có kích cỡ 8 byte --> số phần tử bytes / 8 --> tương đương dịch phải 3 bit
+     * "bytesLength - 1" là để đảm bảo nếu số lượng bytesLength chia hết cho 8 thì nó sẽ ko bị quá thêm 1 bit
+     *      ví dụ: bytesLength = 7 --> cần 1 bit, bytesLength = 9 --> cần 1 bit thôi chứ ko phải 2
+     *      đoạn "+ 1" là để đảm bảo có 1 phần tử long chứa lượng bytes dư ra
+     */
     public static int requiredLongArraySize(final int bytesLength) {
         return ((bytesLength - 1) >> 3) + 1;
     }

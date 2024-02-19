@@ -26,6 +26,10 @@ import org.eclipse.collections.impl.map.mutable.primitive.IntObjectHashMap;
 
 import java.util.Collection;
 
+/**
+ * Chứa thông tin về symbol sắp được add
+ * Có thể convert sang dạng nhị phân
+ */
 @AllArgsConstructor
 @EqualsAndHashCode
 @Getter
