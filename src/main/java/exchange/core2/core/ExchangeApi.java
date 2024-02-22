@@ -73,9 +73,9 @@ public final class ExchangeApi {
         }
     }
 
-    public void submitCommand(ApiCommand cmd) {
-        //log.debug("{}", cmd);
 
+    // convert ApiCommand --> OrderCommand và đẩy vào ring_buffer
+    public void submitCommand(ApiCommand cmd) {
         if (cmd instanceof ApiMoveOrder) {
             ringBuffer.publishEvent(MOVE_ORDER_TRANSLATOR, (ApiMoveOrder) cmd);
         } else if (cmd instanceof ApiPlaceOrder) {
@@ -109,9 +109,10 @@ public final class ExchangeApi {
         }
     }
 
-    public CompletableFuture<CommandResultCode> submitCommandAsync(ApiCommand cmd) {
-        //log.debug("{}", cmd);
 
+    // convert ApiCommand --> OrderCommand và đẩy vào Ring_Buffer
+    // response CommandResultCode
+    public CompletableFuture<CommandResultCode> submitCommandAsync(ApiCommand cmd) {
         if (cmd instanceof ApiMoveOrder) {
             return submitCommandAsync(MOVE_ORDER_TRANSLATOR, (ApiMoveOrder) cmd);
         } else if (cmd instanceof ApiPlaceOrder) {
@@ -143,8 +144,10 @@ public final class ExchangeApi {
         }
     }
 
-    public CompletableFuture<OrderCommand> submitCommandAsyncFullResponse(ApiCommand cmd) {
 
+    // convert ApiCommand --> OrderCommand và đẩy vào Ring_Buffer
+    // response OrderCommand
+    public CompletableFuture<OrderCommand> submitCommandAsyncFullResponse(ApiCommand cmd) {
         if (cmd instanceof ApiMoveOrder) {
             return submitCommandAsyncFullResponse(MOVE_ORDER_TRANSLATOR, (ApiMoveOrder) cmd);
         } else if (cmd instanceof ApiPlaceOrder) {
@@ -173,10 +176,11 @@ public final class ExchangeApi {
     }
 
 
+    // đẩy 1 list ApiCommand vào Ring_Buffer và chờ đợi tất cả thực hiện xong
+    // ở đây nó chỉ đợi msg cuối cùng trong danh sách này vì nó xử lý xong đồng nghĩa là các msg đã xong
     public void submitCommandsSync(List<? extends ApiCommand> cmd) {
-        if (cmd.isEmpty()) {
+        if (cmd.isEmpty())
             return;
-        }
 
         cmd.subList(0, cmd.size() - 1).forEach(this::submitCommand);
         submitCommandAsync(cmd.get(cmd.size() - 1)).join();
@@ -188,14 +192,20 @@ public final class ExchangeApi {
         submitCommandAsync(ApiNop.builder().build()).join();
     }
 
+
+    // submit ApiCommand vào Ring Buffer -> chờ đợi response trả về --> return resultCode
     private <T extends ApiCommand> CompletableFuture<CommandResultCode> submitCommandAsync(EventTranslatorOneArg<OrderCommand, T> translator, final T apiCommand) {
         return submitCommandAsync(translator, apiCommand, c -> c.resultCode);
     }
 
+
+    // submit ApiCommand vào Ring Buffer -> chờ đợi response trả về --> return tất cả giá trị
     private <T extends ApiCommand> CompletableFuture<OrderCommand> submitCommandAsyncFullResponse(EventTranslatorOneArg<OrderCommand, T> translator, final T apiCommand) {
         return submitCommandAsync(translator, apiCommand, Function.identity());
     }
 
+
+    // submit ApiCommand vào Ring Buffer
     private <T extends ApiCommand, R> CompletableFuture<R> submitCommandAsync(final EventTranslatorOneArg<OrderCommand, T> translator,
                                                                               final T apiCommand,
                                                                               final Function<OrderCommand, R> responseTranslator) {
@@ -426,6 +436,7 @@ public final class ExchangeApi {
     }
 
 
+    //region DISRUPTOR TRANSLATOR (convert ApiCommand sang OrderCommand)
     private static final EventTranslatorOneArg<OrderCommand, ApiPlaceOrder> NEW_ORDER_TRANSLATOR = (cmd, seq, api) -> {
         cmd.command = OrderCommandType.PLACE_ORDER;
         cmd.price = api.price;
@@ -521,6 +532,8 @@ public final class ExchangeApi {
         cmd.timestamp = api.timestamp;
         cmd.resultCode = CommandResultCode.NEW;
     };
+    //endregion
+
 
     public void binaryData(int serviceFlags, long eventsGroup, long timestampNs, byte lastFlag, long word0, long word1, long word2, long word3, long word4) {
         ringBuffer.publishEvent(((cmd, seq) -> {

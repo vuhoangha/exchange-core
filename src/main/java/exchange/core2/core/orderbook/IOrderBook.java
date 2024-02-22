@@ -135,7 +135,7 @@ public interface IOrderBook extends WriteBytesMarshallable, StateHash {
     }
 
     /**
-     * Obtain current L2 Market Data snapshot
+     * Lấy order book hiện tại với độ sâu @size
      *
      * @param size max size for each part (ask, bid)
      * @return L2 Market Data snapshot

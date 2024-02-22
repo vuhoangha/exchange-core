@@ -127,11 +127,12 @@ public final class ExchangeCore {
         disruptor.setDefaultExceptionHandler(exceptionHandler);
 
         // advice completable future to use the same CPU socket as disruptor
-        // excutor_service dùng để chạy các matching_engine và risk_engine lên
+        // excutor_service dùng để tạo thread để chạy các matching_engine và risk_engine
+        // thread factory nhằm tạo ra thread mới nếu cần cho ExecutorService
         final ExecutorService loaderExecutor = Executors.newFixedThreadPool(matchingEnginesNum + riskEnginesNum, threadFactory);
 
         // start creating matching engines
-        // tạo các matching_engine với số lượng "matchingEnginesNum"
+        // tạo các matching_engine với số lượng "matchingEnginesNum", shardId bắt đầu từ 0 --> matchingEnginesNum - 1
         final Map<Integer, CompletableFuture<MatchingEngineRouter>> matchingEngineFutures = IntStream.range(0, matchingEnginesNum)
                 .boxed()
                 .collect(Collectors.toMap(
@@ -143,7 +144,7 @@ public final class ExchangeCore {
         // TODO create processors in same thread we will execute it??
 
         // start creating risk engines
-        // tạo các risk_engine với số lượng "riskEnginesNum"
+        // tạo các risk_engine với số lượng "riskEnginesNum", shardId bắt đầu từ 0 --> riskEnginesNum - 1
         final Map<Integer, CompletableFuture<RiskEngine>> riskEngineFutures = IntStream.range(0, riskEnginesNum)
                 .boxed()
                 .collect(Collectors.toMap(
@@ -154,16 +155,17 @@ public final class ExchangeCore {
 
         // tạo các matching_engine_handler từ function "MatchingEngineRouter.processOrder"
         final EventHandler<OrderCommand>[] matchingEngineHandlers = matchingEngineFutures.values().stream()
-                .map(CompletableFuture::join)   //
-                .map(mer -> (EventHandler<OrderCommand>) (cmd, seq, eob) -> mer.processOrder(seq, cmd))
-                .toArray(ExchangeCore::newEventHandlersArray);
+                .map(CompletableFuture::join)   // thực hiện các task tạo matching_engine phía trên
+                .map(mer -> (EventHandler<OrderCommand>) (cmd, seq, eob) -> mer.processOrder(seq, cmd)) // tạo các handler từ matching_engine phía trên
+                .toArray(ExchangeCore::newEventHandlersArray);  // convert từ stream sang array
 
-        // lấy tất cả các risk engine đã được khởi tạo
+        // lấy tất cả các risk engine đã được khởi tạo, key là shardId
         final Map<Integer, RiskEngine> riskEngines = riskEngineFutures.entrySet().stream()
                 .collect(Collectors.toMap(
                         Map.Entry::getKey,
                         entry -> entry.getValue().join()));
 
+        đang dở ở đây rồi
 
         final List<TwoStepMasterProcessor> procR1 = new ArrayList<>(riskEnginesNum);
         final List<TwoStepSlaveProcessor> procR2 = new ArrayList<>(riskEnginesNum);

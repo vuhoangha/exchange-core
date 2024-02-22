@@ -79,7 +79,9 @@ public final class MatchingEngineRouter implements WriteBytesMarshallable {
     // có cho phép chế độ margin ko
     private final boolean cfgMarginTradingEnabled;
 
+    // có gửi order_book của symbol sau mỗi order thành công ko. Vì order_book cần thiết cho risk_engine
     private final boolean cfgSendL2ForEveryCmd;
+    // độ sâu của market deep gửi kèm sau mỗi giao dịch thành công
     private final int cfgL2RefreshDepth;
 
     private final ISerializationProcessor serializationProcessor;
@@ -171,14 +173,11 @@ public final class MatchingEngineRouter implements WriteBytesMarshallable {
 
         final PerformanceConfiguration perfCfg = exchangeCfg.getPerformanceCfg();
         this.cfgSendL2ForEveryCmd = perfCfg.isSendL2ForEveryCmd();
-
-        đang xem dở ở đây
-
         this.cfgL2RefreshDepth = perfCfg.getL2RefreshDepth();
     }
 
-    public void processOrder(long seq, OrderCommand cmd) {
 
+    public void processOrder(long seq, OrderCommand cmd) {
         final OrderCommandType command = cmd.command;
 
         if (command == OrderCommandType.MOVE_ORDER
@@ -258,6 +257,7 @@ public final class MatchingEngineRouter implements WriteBytesMarshallable {
         }
     }
 
+
     private void processMatchingCommand(final OrderCommand cmd) {
 
         final IOrderBook orderBook = orderBooks.get(cmd.symbol);
@@ -266,13 +266,14 @@ public final class MatchingEngineRouter implements WriteBytesMarshallable {
         } else {
             cmd.resultCode = IOrderBook.processCommand(orderBook, cmd);
 
+            // quyết định xem có lấy order_book với độ sâu 'cfgL2RefreshDepth' sau mỗi order thành công ko
+            //
             // posting market data for risk processor makes sense only if command execution is successful, otherwise it will be ignored (possible garbage from previous cycle)
             // TODO don't need for EXCHANGE mode order books?
             // TODO doing this for many order books simultaneously can introduce hiccups
             if ((cfgSendL2ForEveryCmd || (cmd.serviceFlags & 1) != 0)
                     && cmd.command != OrderCommandType.ORDER_BOOK_REQUEST
                     && cmd.resultCode == CommandResultCode.SUCCESS) {
-
                 cmd.marketData = orderBook.getL2MarketDataSnapshot(cfgL2RefreshDepth);
             }
         }
