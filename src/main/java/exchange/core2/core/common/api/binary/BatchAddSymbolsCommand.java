@@ -27,35 +27,40 @@ import org.eclipse.collections.impl.map.mutable.primitive.IntObjectHashMap;
 import java.util.Collection;
 
 /**
- * Chứa thông tin về symbol sắp được add
- * Có thể convert sang dạng nhị phân
+ * Chứa thông tin về list symbol sắp được add
+ * Data được chứa dưới dạng Map và có thể convert qua bytes
  */
 @AllArgsConstructor
 @EqualsAndHashCode
 @Getter
 public final class BatchAddSymbolsCommand implements BinaryDataCommand {
 
+    // map chứa dữ liệu symbol theo symbolId
     private final IntObjectHashMap<CoreSymbolSpecification> symbols;
 
+    // add 1 symbol
     public BatchAddSymbolsCommand(final CoreSymbolSpecification symbol) {
         symbols = IntObjectHashMap.newWithKeysValues(symbol.symbolId, symbol);
     }
 
+    // add list symbol
     public BatchAddSymbolsCommand(final Collection<CoreSymbolSpecification> collection) {
         symbols = new IntObjectHashMap<>(collection.size());
         collection.forEach(s -> symbols.put(s.symbolId, s));
     }
 
-
+    // add list symbol với đầu vào là mảng bytes
     public BatchAddSymbolsCommand(final BytesIn bytes) {
         symbols = SerializationUtils.readIntHashMap(bytes, CoreSymbolSpecification::new);
     }
 
+    // convert "IntObjectHashMap" to bytes
     @Override
     public void writeMarshallable(BytesOut bytes) {
         SerializationUtils.marshallIntHashMap(symbols, bytes);
     }
 
+    // type của data này
     @Override
     public int getBinaryCommandTypeCode() {
         return BinaryCommandType.ADD_SYMBOLS.getCode();

@@ -183,17 +183,21 @@ public final class OrderBookEventsHelper {
         return result;
     }
 
-    private MatcherTradeEvent newMatcherEvent() {
 
+    // lấy
+    private MatcherTradeEvent newMatcherEvent() {
         if (EVENTS_POOLING) {
+            // nếu event chưa có thì lấy từ trong pool ra
             if (eventsChainHead == null) {
                 eventsChainHead = eventChainsSupplier.get();
-//            log.debug("UPDATED HEAD size={}", eventsChainHead == null ? 0 : eventsChainHead.getChainSize());
             }
+
+            // trả ra event hiện tại, gán "eventsChainHead" bằng event ngay sau nó
             final MatcherTradeEvent res = eventsChainHead;
             eventsChainHead = eventsChainHead.nextEvent;
             return res;
         } else {
+            // nếu ko bật chế độ pooling thì đơn giản khởi tạo 1 event mới và trả về
             return new MatcherTradeEvent();
         }
     }

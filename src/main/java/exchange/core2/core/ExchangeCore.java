@@ -90,25 +90,26 @@ public final class ExchangeCore {
 
         final CoreWaitStrategy coreWaitStrategy = perfCfg.getWaitStrategy();
 
+        // khởi tạo disruptor cho phép nhiều producer ghi cùng lúc
         this.disruptor = new Disruptor<>(
-                OrderCommand::new,
-                ringBufferSize,
-                threadFactory,
-                ProducerType.MULTI, // multiple gateway threads are writing
-                coreWaitStrategy.getDisruptorWaitStrategyFactory().get());
+                OrderCommand::new,  // tạo ra sẵn các Obj OrderCommand với số lượng bằng "ringBufferSize", nhằm tránh phải tạo Obj mới khi publish data và giảm tải cho GC
+                ringBufferSize,     // kích thước của ring_buffer, phải đảm bảo là lũy thừa của 2 để có thể dùng phép chia lấy dư bitwise tăng hiệu suất
+                threadFactory,      // tạo ra các thread để consumer xử lý msg. Có bao nhiêu consumer thì từng đó thread
+                ProducerType.MULTI, // config cho phép nhiều producer có thể gửi msg cùng lúc. Tuy nhiên hiệu năng sẽ kém hơn Single do phải sử dụng cơ chế lock
+                coreWaitStrategy.getDisruptorWaitStrategyFactory().get());  // chiến lược chờ đợi event mới của consumer
 
         this.ringBuffer = disruptor.getRingBuffer();
 
         this.api = new ExchangeApi(ringBuffer, perfCfg.getBinaryCommandsLz4CompressorFactory().get());
 
+        // OrderBookNaiveImpl || OrderBookDirectImpl
         final IOrderBook.OrderBookFactory orderBookFactory = perfCfg.getOrderBookFactory();
 
         final int matchingEnginesNum = perfCfg.getMatchingEnginesNum();
         final int riskEnginesNum = perfCfg.getRiskEnginesNum();
 
-        final SerializationConfiguration serializationCfg = exchangeConfiguration.getSerializationCfg();
-
         // creating serialization processor
+        final SerializationConfiguration serializationCfg = exchangeConfiguration.getSerializationCfg();
         serializationProcessor = serializationCfg.getSerializationProcessorFactory().apply(exchangeConfiguration);
 
         // creating shared objects pool
@@ -123,7 +124,6 @@ public final class ExchangeCore {
             ringBuffer.publishEvent(SHUTDOWN_SIGNAL_TRANSLATOR);
             disruptor.shutdown();
         });
-
         disruptor.setDefaultExceptionHandler(exceptionHandler);
 
         // advice completable future to use the same CPU socket as disruptor

@@ -56,6 +56,8 @@ public final class SerializationUtils {
     }
 
     /**
+     * Nén mảng byte truyền vào với LZ4 --> convert mảng byte này sang mảng Long với số phần tử chia hết cho padding
+     *
      * Nén mảng bytes thành 1 mảng long sử dụng Lz4
      * Mảng long đầu ra phải đáp ứng yêu cầu là chứa trọn vẹn dữ liệu mảng bytes và là bội số của "padding"
      */
@@ -81,6 +83,7 @@ public final class SerializationUtils {
 
         int compressedBytesLen = byteBufferCompressed.remaining();
 
+        // chuyển mảng byte sang mảng long với số phần tử mảng long phải chia hết cho 'padding'
         return toLongsArray(
                 byteBufferCompressed.array(),       // các phần tử trong byte_buffer đổi thành array
                 byteBufferCompressed.arrayOffset(),     // lấy vị trí có giá trị đầu tiên trong mảng byte. Ví dụ mảng byte có 100 phần tử, nhưng từ phần tử thứ 2 trở đi mới có giá trị thì offset của nó = 2;
@@ -109,7 +112,7 @@ public final class SerializationUtils {
         final int longLength = requiredLongArraySize(length, padding);
         // tạo 1 long array với độ dài tính toán phía trên
         long[] longArray = new long[longLength];
-        //log.debug("byte[{}]={}", bytes.length, bytes);
+
         // Tạo 1 ByteBuffer với độ dài x2 so với cần thiết (có vẻ để chống tràn bộ đệm nữa)
         final ByteBuffer allocate = ByteBuffer.allocate(longLength * 8 * 2);
         final LongBuffer longBuffer = allocate.asLongBuffer();
@@ -124,10 +127,10 @@ public final class SerializationUtils {
     /**
      * Hàm này lấy kích cỡ của mảng long cần để chứa mảng bytes có "bytesLength" phần tử
      * Kích cỡ mảng long đầu ra phải là bội số của "padding"
-     * Ví dụ bytesLength = 100;
-     *      requiredLongArraySize(100) = 13
-     *      rem = 13 % 4 = 1
-     *      len output = 13 + (4 - 1) = 16
+     * Ví dụ bytesLength = 100, padding = 4;
+     * requiredLongArraySize(100) = 13
+     * rem = 13 % 4 = 1
+     * len output = 13 + (4 - 1) = 16
      */
     public static int requiredLongArraySize(final int bytesLength, final int padding) {
         int len = requiredLongArraySize(bytesLength);
@@ -183,8 +186,8 @@ public final class SerializationUtils {
      * Xác định chính xác số lượng phần tử tối thiểu trong long array để chứa hết mảng bytes có 'bytesLength' phần tử
      * vì kiểu long có kích cỡ 8 byte --> số phần tử bytes / 8 --> tương đương dịch phải 3 bit
      * "bytesLength - 1" là để đảm bảo nếu số lượng bytesLength chia hết cho 8 thì nó sẽ ko bị quá thêm 1 bit
-     *      ví dụ: bytesLength = 7 --> cần 1 bit, bytesLength = 9 --> cần 1 bit thôi chứ ko phải 2
-     *      đoạn "+ 1" là để đảm bảo có 1 phần tử long chứa lượng bytes dư ra
+     * ví dụ: bytesLength = 7 --> cần 1 bit, bytesLength = 9 --> cần 1 bit thôi chứ ko phải 2
+     * đoạn "+ 1" là để đảm bảo có 1 phần tử long chứa lượng bytes dư ra
      */
     public static int requiredLongArraySize(final int bytesLength) {
         return ((bytesLength - 1) >> 3) + 1;
@@ -325,7 +328,7 @@ public final class SerializationUtils {
         });
     }
 
-
+    // convert bytes sang IntObjectHashMap
     public static <T> IntObjectHashMap<T> readIntHashMap(final BytesIn bytes, final Function<BytesIn, T> creator) {
         int length = bytes.readInt();
         final IntObjectHashMap<T> hashMap = new IntObjectHashMap<>(length);

@@ -55,7 +55,7 @@ public final class MatchingEngineRouter implements WriteBytesMarshallable {
     // state
     private final BinaryCommandsProcessor binaryCommandsProcessor;
 
-    // symbol->OB
+    // symbol -> order_book
     private final IntObjectHashMap<IOrderBook> orderBooks;
 
     private final IOrderBook.OrderBookFactory orderBookFactory;
@@ -66,12 +66,17 @@ public final class MatchingEngineRouter implements WriteBytesMarshallable {
     private final ObjectsPool objectsPool;
 
     // sharding by symbolId
+    // hệ thống có nhiều symbol và các symbol sẽ được gom vào từng shard, mỗi shard sẽ được xử lý bởi 1 matching engine
     private final int shardId;
+    // là 1 mặt nạ có dạng 1111..(n số '1') có tác dụng để tìm shard_id từ id của symbol.
+    // Ví dụ ta chia các symbol làm 8 shard, thì shardMask = 7 (111). Muốn tìm shardId ta lấy (symbol_id & shardMask)
+    // bản chất là phép modulo thôi nhưng performance tốt hơn
     private final long shardMask;
 
     private final String exchangeId; // TODO validate
     private final Path folder;
 
+    // có cho phép chế độ margin ko
     private final boolean cfgMarginTradingEnabled;
 
     private final boolean cfgSendL2ForEveryCmd;
@@ -82,13 +87,13 @@ public final class MatchingEngineRouter implements WriteBytesMarshallable {
     private final LoggingConfiguration loggingCfg;
     private final boolean logDebug;
 
-    public MatchingEngineRouter(final int shardId,
-                                final long numShards,
+    public MatchingEngineRouter(final int shardId,      // shard_id của matching engine instance hiện tại
+                                final long numShards,   // tổng số lượng shard cho các symbol
                                 final ISerializationProcessor serializationProcessor,
-                                final IOrderBook.OrderBookFactory orderBookFactory,
+                                final IOrderBook.OrderBookFactory orderBookFactory,     // factory tạo orderbook khi cần. Naive | Direct tùy thuộc config
                                 final SharedPool sharedPool,
-                                final ExchangeConfiguration exchangeCfg) {
-
+                                final ExchangeConfiguration exchangeCfg) {  // config hệ thống để chạy
+        // đếm số bit có giá trị 1. Các số là bội số của 2 sẽ luôn có dạng 1000xxx (với n số '0' phía sau)
         if (Long.bitCount(numShards) != 1) {
             throw new IllegalArgumentException("Invalid number of shards " + numShards + " - must be power of 2");
         }
@@ -98,6 +103,7 @@ public final class MatchingEngineRouter implements WriteBytesMarshallable {
         this.exchangeId = initStateCfg.getExchangeId();
         this.folder = Paths.get(DiskSerializationProcessorConfiguration.DEFAULT_FOLDER);
 
+        // shard_id và shard_mask
         this.shardId = shardId;
         this.shardMask = numShards - 1;
         this.serializationProcessor = serializationProcessor;
@@ -108,6 +114,7 @@ public final class MatchingEngineRouter implements WriteBytesMarshallable {
         this.logDebug = loggingCfg.getLoggingLevels().contains(LoggingConfiguration.LoggingLevel.LOGGING_MATCHING_DEBUG);
 
         // initialize object pools // TODO move to perf config
+        // #desc chưa hiểu làm gì
         final HashMap<Integer, Integer> objectsPoolConfig = new HashMap<>();
         objectsPoolConfig.put(ObjectsPool.DIRECT_ORDER, 1024 * 1024);
         objectsPoolConfig.put(ObjectsPool.DIRECT_BUCKET, 1024 * 64);
@@ -118,7 +125,6 @@ public final class MatchingEngineRouter implements WriteBytesMarshallable {
         this.objectsPool = new ObjectsPool(objectsPoolConfig);
 
         if (ISerializationProcessor.canLoadFromSnapshot(serializationProcessor, initStateCfg, shardId, MODULE_ME)) {
-
             final DeserializedData deserialized = serializationProcessor.loadData(
                     initStateCfg.getSnapshotId(),
                     ISerializationProcessor.SerializedModuleType.MATCHING_ENGINE_ROUTER,
@@ -165,6 +171,9 @@ public final class MatchingEngineRouter implements WriteBytesMarshallable {
 
         final PerformanceConfiguration perfCfg = exchangeCfg.getPerformanceCfg();
         this.cfgSendL2ForEveryCmd = perfCfg.isSendL2ForEveryCmd();
+
+        đang xem dở ở đây
+
         this.cfgL2RefreshDepth = perfCfg.getL2RefreshDepth();
     }
 
@@ -230,15 +239,14 @@ public final class MatchingEngineRouter implements WriteBytesMarshallable {
     }
 
 
+    // check xem matching_engine instance hiện tại có xử lý symbol này ko
+    // check bằng cách xác định symbol thuộc shard nào, có giống shard của matching_engine instance này
     private boolean symbolForThisHandler(final long symbol) {
         return (shardMask == 0) || ((symbol & shardMask) == shardId);
     }
 
 
     private void addSymbol(final CoreSymbolSpecification spec) {
-
-//        log.debug("ME add symbolSpecification: {}", symbolSpecification);
-
         if (spec.type != SymbolType.CURRENCY_EXCHANGE_PAIR && !cfgMarginTradingEnabled) {
             log.warn("Margin symbols are not allowed: {}", spec);
         }

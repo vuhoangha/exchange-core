@@ -275,6 +275,10 @@ Giao dịch BTC/USDT
     - [UnifiedSet — Trình tiết kiệm bộ nhớ](https://medium.com/oracledevs/unifiedset-the-memory-saver-25b830745959)
     - [Ten reasons to use Eclipse Collections](https://medium.com/oracledevs/ten-reasons-to-use-eclipse-collections-91593104af9d)
     - [Sơ đồ chức năng trong Eclipse Collections](https://medium.com/oracledevs/visualizing-eclipse-collections-646dad9533a9)
+- IntObjectHashMap:
+  - Là cấu trúc Map ánh xạ giá trị `int` tới 'object'
+  - có hiệu suất tốt hơn và tiết kiệm bộ nhớ hơn
+  - ko lưu trữ thứ tự key add vào
 
 ## [LMAX DISRUPTOR](https://github.com/LMAX-Exchange/disruptor)
 - [Example 1](https://lmax-exchange.github.io/disruptor/user-guide/index.html)
@@ -295,6 +299,15 @@ Giao dịch BTC/USDT
         - Nó dùng ReentrantLock & Wait & Notify để xử lý
         - Đây là cách xử lý chậm nhất vì phải Locking nhưng sẽ an toàn, thân thiện với CPU nhưng đổi lại là tốc độ thực thi chậm nhất.
         - Phù hợp cho hệ thống có CPU thấp, thường xuyên qúa tải và ko yêu cầu low latency.
+- ProducerType
+  - SINGLE: chỉ định chỉ có một luồng sản xuất (producer thread) sẽ đẩy event vào RingBuffer tại một thời điểm. Điều này cho phép Disruptor loại bỏ việc sử dụng đồng bộ hóa (synchronization) hoặc cơ chế khóa (locking mechanisms) khi sản xuất sự kiện, dẫn tới hiệu suất cao nhất có thể khi tình huống chỉ một luồng đang gửi sự kiện vào buffer.
+  - MULTI: sử dụng khi nhiều luồng sản xuất đồng thời đẩy sự kiện vào RingBuffer. Lúc này, Disruptor đảm bảo rằng việc truy cập và cập nhật RingBuffer là an toàn giữa các luồng, sử dụng đồng bộ hóa hoặc các cơ chế khóa để tránh điều kiện đua (race conditions) và đảm bảo tính nhất quán dữ liệu. Dù cung cấp khả năng linh hoạt cao hơn khi xử lý từ nhiều nguồn, nó cũng đồng nghĩa với việc giảm hiệu suất so với SINGLE do overhead liên quan đến việc đồng bộ hóa.
+  - Ví dụ: Nếu ta có nhiều producer nhưng lại config type 'SINGLE' dẫn tới 2 producer có thể ghi đè data lên vị trí chưa xử lý, số thứ tự (sequence) lúc này cũng sẽ ko chính xác. Còn nếu chỉ có 1 producer mà config là 'MULTI' tuy ko ảnh hưởng logic nhưng performance sẽ bị chậm ko cần thiết.
+- Consumer sẽ xử lý event theo batch để tránh update lại biến sequence quá nhiều làm giảm hiệu năng
+  - https://stackoverflow.com/questions/48352411/why-my-disruptor-program-dont-take-full-advantage-of-the-ringbuffer
+- Khi ring buffer đầy, producer mặc định sẽ chờ ring buffer có slot trống mới đẩy tiếp dữ liệu. Ta có thể ghi đè luôn vào. Thường case này xảy ra khi producer đẩy event nhanh hơn consumer xử lý, để giải quyết bài toán này ta cần chiến lược tạm gọi BackPressure.
+  - Tham khảo: https://mechanical-sympathy.blogspot.com/2012/05/apply-back-pressure-when-overloaded.html
+- Vì consumer xử lý theo batch nên sẽ có trường hợp khi ring_buffer có nhiều msg, consumer sẽ xử lý tất cả msg đang có trong ring_buffer rồi mới update slot available để producer ghi tiếp.
 
 ## [LZ4](https://github.com/lz4/lz4-java)
 - Là 1 thư viện dùng để nén data có tốc độ nhanh và kích cỡ nhỏ
@@ -432,3 +445,14 @@ public class LoadLoadExample {
     }
 }
 ```
+
+### Level Price
+##### Level 1
+- Là cấp độ cơ bản nhất và thường miễn phí cho người dùng.
+- Cung cấp thông tin cơ bản như bid_price, ask_price hiện tại, khối lượng và giá giao dịch gần nhất.
+##### Level 2
+- Cung cấp thông tin chi tiết hơn so với Level 1 và thường yêu cầu một khoản phí đăng ký từ người dùng.
+- Ngoài thông tin cơ bản, Level 2 còn cung cấp thông tin về mức độ sâu của thị trường (độ sâu thường có giới hạn), bao gồm các mức giá và khối lượng của các lệnh giao dịch đặt mua và đặt bán ở mức giá khác nhau.
+##### Level 3
+- là cấp độ thông tin cao nhất và thường được sử dụng bởi các nhà giao dịch chuyên nghiệp và tổ chức tài chính.
+- Nó cung cấp toàn bộ thông tin về sâu độ thị trường, bao gồm cả thông tin về lệnh giao dịch ẩn và lệnh giao dịch lớn được ẩn dưới dạng lệnh điều kiện. Điều này giúp nhà giao dịch có cái nhìn chi tiết và toàn diện hơn về hoạt động thị trường.

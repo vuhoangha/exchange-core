@@ -30,7 +30,17 @@ import java.util.Objects;
 // TODO REJECT needs remaining size (can not write into size),
 
 /**
- * #desc
+ * lưu trữ các action của 1 order theo chuỗi liên tiếp
+ * Ví dụ
+ * action_1: {
+ *     next: {
+ *         action_2: {
+ *             next: {
+ *                 action_3
+ *             }
+ *         }
+ *     }
+ * }
  */
 @AllArgsConstructor
 @NoArgsConstructor

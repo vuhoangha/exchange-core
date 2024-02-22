@@ -22,6 +22,83 @@ import org.junit.jupiter.api.Test;
 @Slf4j
 public class ITCoreExample {
 
+
+    @Test
+    public void kendrickTest() throws Exception {
+
+        // simple async events handler
+        SimpleEventsProcessor eventsProcessor = new SimpleEventsProcessor(new IEventsHandler() {
+            @Override
+            public void tradeEvent(TradeEvent tradeEvent) {
+                System.out.println("Trade event: " + tradeEvent);
+            }
+
+            @Override
+            public void reduceEvent(ReduceEvent reduceEvent) {
+                System.out.println("Reduce event: " + reduceEvent);
+            }
+
+            @Override
+            public void rejectEvent(RejectEvent rejectEvent) {
+                System.out.println("Reject event: " + rejectEvent);
+            }
+
+            @Override
+            public void commandResult(ApiCommandResult commandResult) {
+                System.out.println("Command result: " + commandResult);
+            }
+
+            @Override
+            public void orderBook(OrderBook orderBook) {
+                System.out.println("OrderBook event: " + orderBook);
+            }
+        });
+
+        // default exchange configuration
+        ExchangeConfiguration conf = ExchangeConfiguration.defaultBuilder().build();
+
+        // build exchange core
+        ExchangeCore exchangeCore = ExchangeCore.builder()
+                .resultsConsumer(eventsProcessor)
+                .exchangeConfiguration(conf)
+                .build();
+
+        // start up disruptor threads
+        exchangeCore.startup();
+
+        // get exchange API for publishing commands
+        ExchangeApi api = exchangeCore.getApi();
+
+        // currency code constants
+        final int currencyCodeXbt = 11;
+        final int currencyCodeLtc = 15;
+
+        // symbol constants
+        final int symbolXbtLtc = 241;
+
+        Future<CommandResultCode> future;
+
+        // create symbol specification and publish it
+        CoreSymbolSpecification symbolSpecXbtLtc = CoreSymbolSpecification.builder()
+                .symbolId(symbolXbtLtc)         // symbol id
+                .type(SymbolType.CURRENCY_EXCHANGE_PAIR)
+                .baseCurrency(currencyCodeXbt)    // base = satoshi (1E-8)
+                .quoteCurrency(currencyCodeLtc)   // quote = litoshi (1E-8)
+                .baseScaleK(1_000_000L) // 1 lot = 1M satoshi (0.01 BTC)
+                .quoteScaleK(10_000L)   // 1 price step = 10K litoshi
+                .takerFee(1900L)        // taker fee 1900 litoshi per 1 lot
+                .makerFee(700L)         // maker fee 700 litoshi per 1 lot
+                .build();
+
+        // đẩy lệnh này vào trong core xử lý
+        future = api.submitBinaryDataAsync(new BatchAddSymbolsCommand(symbolSpecXbtLtc));
+        System.out.println("BatchAddSymbolsCommand result: " + future.get());
+
+        System.out.println("Haha");
+    }
+
+
+
     @Test
     public void sampleTest() throws Exception {
 
@@ -89,6 +166,7 @@ public class ITCoreExample {
                 .makerFee(700L)         // maker fee 700 litoshi per 1 lot
                 .build();
 
+        // đẩy lệnh này vào trong core xử lý
         future = api.submitBinaryDataAsync(new BatchAddSymbolsCommand(symbolSpecXbtLtc));
         System.out.println("BatchAddSymbolsCommand result: " + future.get());
 

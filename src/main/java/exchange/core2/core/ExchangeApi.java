@@ -52,22 +52,21 @@ import java.util.stream.Stream;
 @RequiredArgsConstructor
 public final class ExchangeApi {
 
+    // ring buffer được khởi tạo từ bên exchange-core
     private final RingBuffer<OrderCommand> ringBuffer;
     private final LZ4Compressor lz4Compressor;
 
     // promises cache (TODO can be changed to queue)
+    // chứa các callback để sau khi xử lý hoàn tất 1 task, sẽ callback về cho bên ngoài biết
     private final Map<Long, Consumer<OrderCommand>> promises = new ConcurrentHashMap<>();
 
-    // số lượng biến long cần thiết để lưu trữ 1 msg
+    // số lượng biến long cần thiết để lưu trữ 1 msg. 1 long = 8 byte. 1 byte = 8 bit
     // 5 biến long --> 5 * 8 * 8 = 320 bit
     public static final int LONGS_PER_MESSAGE = 5;
 
 
+    // nếu có callback của task này thì call về
     public void processResult(final long seq, final OrderCommand cmd) {
-
-//        if (cmd.command == OrderCommandType.BINARY_DATA_COMMAND
-//                || cmd.command == OrderCommandType.BINARY_DATA_QUERY) {
-
         final Consumer<OrderCommand> consumer = promises.remove(seq);
         if (consumer != null) {
             consumer.accept(cmd);
@@ -225,6 +224,8 @@ public final class ExchangeApi {
         return future1.thenCombineAsync(future2, CommandResultCode::mergeToFirstFailed);
     }
 
+
+    // gửi data nhị phân vào trong core
     public CompletableFuture<CommandResultCode> submitBinaryDataAsync(final BinaryDataCommand data) {
 
         final CompletableFuture<CommandResultCode> future = new CompletableFuture<>();
@@ -235,7 +236,9 @@ public final class ExchangeApi {
                 data.getBinaryCommandTypeCode(),
                 (int) System.nanoTime(), // can be any value because sequence is used for result identification, not transferId
                 0L,
-                seq -> promises.put(seq, orderCommand -> future.complete(orderCommand.resultCode)));
+                seq -> {
+                    promises.put(seq, orderCommand -> future.complete(orderCommand.resultCode));
+                });
 
         return future;
     }
@@ -297,23 +300,26 @@ public final class ExchangeApi {
                 endSeqConsumer);
     }
 
+
+    /**
+     * cmdType: loại command (PLACE_ORDER, ADD_USER, BINARY_DATA_COMMAND,...vv)
+     * data: data gửi đi
+     * dataTypeCode: loại data (ADD_SYMBOLS...vv)
+     */
     private void publishBinaryData(final OrderCommandType cmdType,
                                    final WriteBytesMarshallable data,
                                    final int dataTypeCode,
                                    final int transferId,
                                    final long timestamp,
                                    final LongConsumer endSeqConsumer) {
-        đang dở ở đây
-
-        // từ data đầu vào
+        // nén mảng bytes đầu vào sang mảng long bằng LZ4 và số phần tử mảng long phải chia hết cho LONGS_PER_MESSAGE
         final long[] longsArrayData = SerializationUtils.bytesToLongArrayLz4(
                 lz4Compressor,
                 BinaryCommandsProcessor.serializeObject(data, dataTypeCode),
                 LONGS_PER_MESSAGE);
 
+        // số lượng msg thực tế. Vì phải cần "LONGS_PER_MESSAGE" biến long để chứa 1 msg
         final int totalNumMessagesToClaim = longsArrayData.length / LONGS_PER_MESSAGE;
-
-//        log.debug("longsArrayData[{}] n={}", longsArrayData.length, totalNumMessagesToClaim);
 
         // max fragment size is quarter of ring buffer
         final int batchSize = ringBuffer.getBufferSize() / 4;
@@ -349,9 +355,6 @@ public final class ExchangeApi {
         final long highSeq = ringBuffer.next(fragmentSize);
         final long lowSeq = highSeq - fragmentSize + 1;
 
-//        log.debug("  offset*longsPerMessage={} longsArrayData[{}] n={} seq={}..{} lastFragment={} fragmentSize={}",
-//                offset * LONGS_PER_MESSAGE, longsArrayData.length, fragmentSize, lowSeq, highSeq, isLastFragment, fragmentSize);
-
         try {
             int ptr = offset * LONGS_PER_MESSAGE;
             for (long seq = lowSeq; seq <= highSeq; seq++) {
@@ -369,11 +372,6 @@ public final class ExchangeApi {
 
                 cmd.timestamp = timestamp;
                 cmd.resultCode = CommandResultCode.NEW;
-
-//                log.debug("ORIG {}", String.format("f=%d word0=%X word1=%X word2=%X word3=%X word4=%X",
-//                cmd.symbol, longArray[i], longArray[i + 1], longArray[i + 2], longArray[i + 3], longArray[i + 4]));
-
-//                log.debug("seq={} cmd.size={} data={}", seq, cmd.size, cmd.price);
 
                 ptr += LONGS_PER_MESSAGE;
             }

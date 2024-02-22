@@ -24,6 +24,9 @@ import java.util.concurrent.LinkedBlockingQueue;
 @Slf4j
 public final class SharedPool {
 
+    // queue theo dạng FIFO
+    // ko giới hạn kích thước
+    // thread-safe
     private final LinkedBlockingQueue<MatcherTradeEvent> eventChainsBuffer;
 
     @Getter
@@ -36,25 +39,30 @@ public final class SharedPool {
     /**
      * Create new shared pool
      *
-     * @param poolMaxSize     - max size of pool. Will skip new chains if chains buffer is full.
-     * @param poolInitialSize - initial number of pre-generated chains. Recommended to set higher than number of modules - (RE+ME)*2.
-     * @param chainLength     - target chain length. Longer chain means rare requests for new chains. However longer chains can cause event placeholders starvation.
+     * @param poolMaxSize     - kích thước tối đa của pool, nếu pool full thì sẽ ko thể insert thêm vào nữa. (max size of pool. Will skip new chains if chains buffer is full).
+     * @param poolInitialSize - số lượng khởi tạo của các chains generated trước. (initial number of pre-generated chains. Recommended to set higher than number of modules - (RE+ME)*2).
+     * @param chainLength     - độ dài chuỗi khởi tạo (target chain length. Longer chain means rare requests for new chains. However longer chains can cause event placeholders starvation).
      */
     public SharedPool(final int poolMaxSize, final int poolInitialSize, final int chainLength) {
 
+        // size init mà lớn hơn size max của pool thì error
         if (poolInitialSize > poolMaxSize) {
             throw new IllegalArgumentException("too big poolInitialSize");
         }
 
+        // tạo pool với max size như trên
         this.eventChainsBuffer = new LinkedBlockingQueue<>(poolMaxSize);
         this.chainLength = chainLength;
 
+        // tạo các chain với độ dài cố định
         for (int i = 0; i < poolInitialSize; i++) {
             this.eventChainsBuffer.add(MatcherTradeEvent.createEventChain(chainLength));
         }
     }
 
     /**
+     * Lấy phần tử head của Pool này. Nếu ko có thì tự khởi tạo rồi trả về
+     *
      * Request next chain from buffer
      * Threadsafe
      *
@@ -62,7 +70,6 @@ public final class SharedPool {
      */
     public MatcherTradeEvent getChain() {
         MatcherTradeEvent poll = eventChainsBuffer.poll();
-//        log.debug("<<< POLL CHAIN HEAD  size={}", poll == null ? 0 : poll.getChainSize());
         if (poll == null) {
             poll = MatcherTradeEvent.createEventChain(chainLength);
         }
@@ -71,6 +78,8 @@ public final class SharedPool {
     }
 
     /**
+     *
+     *
      * Offers next chain.
      * Threadsafe (single producer safety is sufficient)
      *
