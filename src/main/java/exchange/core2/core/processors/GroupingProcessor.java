@@ -28,6 +28,10 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static exchange.core2.core.ExchangeCore.EVENTS_POOLING;
 
+
+/**
+ * Các processor sẽ tự quản lý sequence (là số thứ tự của event trong ring_buffer)
+ */
 @Slf4j
 public final class GroupingProcessor implements EventProcessor {
     private static final int IDLE = 0;      // trạng thái nhàn rỗi
@@ -36,7 +40,7 @@ public final class GroupingProcessor implements EventProcessor {
 
     private static final int GROUP_SPIN_LIMIT = 1000;
 
-    // TODO move into configuration
+    // định kì 10ms, L2 data sẽ được publish
     private static final int L2_PUBLISH_INTERVAL_NS = 10_000_000;
 
     private final AtomicInteger running = new AtomicInteger(IDLE);
@@ -44,7 +48,7 @@ public final class GroupingProcessor implements EventProcessor {
     private final SequenceBarrier sequenceBarrier;
     private final WaitSpinningHelper waitSpinningHelper;
 
-    // để quản lý số thứ tự của cái gì đó (#desc)
+    // để quản lý số thứ tự event đã xử lý từ ring_buffer
     private final Sequence sequence = new Sequence(Sequencer.INITIAL_CURSOR_VALUE);
 
     private final SharedPool sharedPool;
@@ -70,17 +74,21 @@ public final class GroupingProcessor implements EventProcessor {
         this.sharedPool = sharedPool;
     }
 
+
     // lấy số thứ tự #desc
     @Override
     public Sequence getSequence() {
         return sequence;
     }
 
+
+    // stop processor này
     @Override
     public void halt() {
         running.set(HALTED);
         sequenceBarrier.alert();
     }
+
 
     @Override
     public boolean isRunning() {
@@ -118,7 +126,9 @@ public final class GroupingProcessor implements EventProcessor {
         }
     }
 
+
     private void processEvents() {
+        // event tiếp theo sẽ xử lý
         long nextSequence = sequence.get() + 1L;
 
         long groupCounter = 0;
@@ -138,15 +148,18 @@ public final class GroupingProcessor implements EventProcessor {
 
         while (true) {
             try {
-
-                // should spin and also check another barrier
+                // consumer chờ đợi 'nextSequence', sau khi hàm này xong thì 'availableSequence' đã chính thức có mặt trong ring_buffer
                 long availableSequence = waitSpinningHelper.tryWaitFor(nextSequence);
 
+                /*
+                 * xử lý lần lượt các event từ 'nextSequence' --> 'availableSequence'
+                 * vì trong trường hợp nextSequence < availableSequence thì nghĩa là event 'availableSequence' = nextSequence - 1 ---> đã được consumer xử lý trước đó
+                 * có trường hợp producer send event nhanh hơn consumer xử lý --> nextSequence < availableSequence ---> consumer sẽ phải xử lý lần lượt từng event 1 cho tới 'availableSequence'
+                 */
                 if (nextSequence <= availableSequence) {
                     while (nextSequence <= availableSequence) {
 
                         final OrderCommand cmd = ringBuffer.get(nextSequence);
-
                         nextSequence++;
 
                         if (cmd.command == OrderCommandType.GROUPING_CONTROL) {

@@ -265,6 +265,23 @@ Giao dịch BTC/USDT
     - Giá internal chính là số lượng price_step
 #### Statehash
 - Có vẻ mục đích là để lấy trạng thái hiện tại của 1 object. Vì object hash bởi các field nên nếu field giống nhau sẽ luôn cho ra statehash giống nhau
+#### Giải pháp giảm thiểu tính toán
+- Msg để sau này tham khảo trong nhóm chat
+  - making risk engine horizontally scalable is doable but it has tradeoffs
+  - mostly those tradeoffs show when some sort of huge liquidation event happens on the market, when everything moves fast
+- Với các user có position nhỏ (kiểu < 100$), khi giá thay đổi 1 chút, liệu ta có cần tính toán lại vị thế hiện tại của họ ko. Ta nên ưu tiên những ông có vị thế lớn, giao dịch thường xuyên hơn
+- Khi 1 ông đang Long BTC, giá BTC tăng thì liệu ta có cần tính toán lại vị thế thanh lý của ông này ko, rõ ràng là ko
+- Sắp xếp lại vị trí các ông từ dễ thanh lý nhất tới ít bị thanh lý. Khi ta quét tới 1 ông trong list mà ko bị thanh lý thì những ông sau bỏ qua
+- Có thể theo dõi xem mức thay đổi giá có đủ lớn để cập nhật lại và sau thời gian bao lâu đó thì nên cập nhật 
+#### Chart
+Ý tưởng tạo chart là như sau:
+- Data từ thằng core ghi vào chronicle queue rồi nó tự sync qua các service khác
+- Bên service xử lý chart sẽ tự tổng hợp các giao dịch khớp lệnh để tạo ra các nến 1 phút. Cứ lúc đóng nến thì ghi vào chronicle-queue với key "BTCUSDT###1m" chẳng hạn. Nến 1m hiện tại thì vẫn ở trong memory bình thường nhé, đóng nến mới đẩy vào queue thôi.
+- Từ nến 1 phút ta tính ra được nến 5m --> 10m --> ...
+#### Extra document
+- [Tài liệu về cách bên Chronicle xây dựng Matching Engine](https://portal.chronicle.software/docs/reports/ChronicleMatchingEngine.pdf)
+- [Giao thức Chronicle FIX](https://chronicle.software/choosing-chronicle-fix-engine/)
+
 
 ## [ECLIPSE COLLECTIONS](https://github.com/eclipse/eclipse-collections)
 - Bộ thư viện chuyên về sử dụng List, Set, Map, HashMap...vvv
@@ -308,6 +325,16 @@ Giao dịch BTC/USDT
 - Khi ring buffer đầy, producer mặc định sẽ chờ ring buffer có slot trống mới đẩy tiếp dữ liệu. Ta có thể ghi đè luôn vào. Thường case này xảy ra khi producer đẩy event nhanh hơn consumer xử lý, để giải quyết bài toán này ta cần chiến lược tạm gọi BackPressure.
   - Tham khảo: https://mechanical-sympathy.blogspot.com/2012/05/apply-back-pressure-when-overloaded.html
 - Vì consumer xử lý theo batch nên sẽ có trường hợp khi ring_buffer có nhiều msg, consumer sẽ xử lý tất cả msg đang có trong ring_buffer rồi mới update slot available để producer ghi tiếp.
+##### Sequence Barrier
+- là cơ chế đồng bộ hóa được sử dụng để kiểm soát tiến trình đọc dữ liệu từ RingBuffer.
+- giúp các Consumer đợi cho đến khi dữ liệu (seq) mà nó muốn xử lý đã sẵn sàng.
+- đảm bảo Consumer không xử lý event cho đến khi các event số thứ tự nhỏ hơn được xử lý bởi các Consumer khác, giữ cho thứ tự các event được xử lý đúng đắn và nhất quán.
+- SequenceBarrier sẽ chứa một Sequence đại diện cho tiến trình của Consumer. Nó là số thứ tự của từng event và các consumer sẽ dựa theo số thứ tự đó để chờ đợi.
+##### EventProcessor
+- chịu trách nhiệm xử lý các event được bắn vào ring_buffer từ producer
+- trong mỗi EventProcessor đều có riêng 1 Sequence để quản lý thứ tự các event đã đọc và xử lý
+- mỗi EventProcessor nhận 1 SequenceBarrier đầu vào nhằm mục đích lấy thứ tự các event được producer gửi vào Ring_buffer
+
 
 ## [LZ4](https://github.com/lz4/lz4-java)
 - Là 1 thư viện dùng để nén data có tốc độ nhanh và kích cỡ nhỏ
@@ -456,3 +483,18 @@ public class LoadLoadExample {
 ##### Level 3
 - là cấp độ thông tin cao nhất và thường được sử dụng bởi các nhà giao dịch chuyên nghiệp và tổ chức tài chính.
 - Nó cung cấp toàn bộ thông tin về sâu độ thị trường, bao gồm cả thông tin về lệnh giao dịch ẩn và lệnh giao dịch lớn được ẩn dưới dạng lệnh điều kiện. Điều này giúp nhà giao dịch có cái nhìn chi tiết và toàn diện hơn về hoạt động thị trường.
+
+
+
+Công ty tôi đang muốn xây dựng 1 sàn giao dịch crypto và tôi đang nghiên cứu các công nghệ cần thiết cho việc đó. Tôi rất ấn tượng với
+hiệu suất mà Chronicle Queue đạt được. Nhưng tôi vẫn có một vài thắc mắc về Chronicle Queue Enterprise:
+
+1. Chronicle Queue Enterprise có thể sử dụng trên nhiều VM và chúng giao tiếp với nhau qua TCP/UDP, vậy chúng có Master/Slave không? Giả sử service_A chạy trên VM_A, service_B chạy trên VM_B thì chúng có thể cùng ghi vào 1 queue được không?
+2. Giả sử mạng kết nối giữa 2 VM bị tắc nghẽn, cả 2 cùng ghi vào 1 queue thì Chronicle Queue sẽ merge các dữ liệu này lại như nào, hay là chỉ lấy 1 trong 2 và đồng bộ VM còn lại
+3. Khi tôi muốn thêm 1 service_C trên VM_C vào Chronicle Queue và tôi chỉ quan tâm đến Queue_X thì các queue khác không cần thiết như Queue_A, Queue_B có bị đồng bộ sang VM_C không? Và nếu đồng bộ tất thì việc này có diễn ra lâu không? Tôi quan tâm chỉ vì tôi muốn xây dựng các microservice triển khai trên Kubernetes có thể auto scaling khi cần, chỉ đọc dữ liệu từ Chronicle Queue và phản hồi về cho user.
+4. Việc thiết lập Chronicle Queue Enterprise có đơn giản không? VM_A với 1 IP và folder cụ thể, tương tự với VM_B phải không? Và liệu việc sử dụng nó trên Kubernetes có khả thi không?
+
+Sau cùng, xin lỗi vì khả năng nghe, nói tiếng Anh của tôi không được tốt, vậy nên tôi nghĩ sẽ tốt hơn nếu chúng ta trao đổi qua các kênh chat như Whatapps, Telegram.
+
+Whatapps: +84 96 209 54 92
+Telegram: @havu1095

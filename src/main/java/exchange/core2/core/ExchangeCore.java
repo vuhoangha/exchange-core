@@ -165,25 +165,25 @@ public final class ExchangeCore {
                         Map.Entry::getKey,
                         entry -> entry.getValue().join()));
 
-        đang dở ở đây rồi
-
         final List<TwoStepMasterProcessor> procR1 = new ArrayList<>(riskEnginesNum);
         final List<TwoStepSlaveProcessor> procR2 = new ArrayList<>(riskEnginesNum);
 
         // 1. grouping processor (G)
+        // GroupingProcessor sẽ xử lý data đầu vào từ ring_buffer trước
         final EventHandlerGroup<OrderCommand> afterGrouping =
                 disruptor.handleEventsWith(
                         (ringBuffer, sequences) -> new GroupingProcessor(ringBuffer, ringBuffer.newBarrier(sequences), perfCfg, coreWaitStrategy, sharedPool));
 
         // 2. [journaling (J)] in parallel with risk hold (R1) + matching engine (ME)
-
+        // ghi log sau khi GroupingProcessor hoàn thành
         boolean enableJournaling = serializationCfg.isEnableJournaling();
         final EventHandler<OrderCommand> jh = enableJournaling ? serializationProcessor::writeToJournal : null;
-
         if (enableJournaling) {
+            // hàm này sẽ add 'jh' thực hiện sau khi 'GroupingProcessor' hoàn thành
             afterGrouping.handleEventsWith(jh);
         }
 
+        // chạy sau khi GroupingProcessor hoàn thành và song song với việc ghi log
         riskEngines.forEach((idx, riskEngine) -> afterGrouping.handleEventsWith(
                 (rb, bs) -> {
                     final TwoStepMasterProcessor r1 = new TwoStepMasterProcessor(rb, rb.newBarrier(bs), riskEngine::preProcessCommand, exceptionHandler, coreWaitStrategy, "R1_" + idx);
@@ -191,7 +191,8 @@ public final class ExchangeCore {
                     return r1;
                 }));
 
-        disruptor.after(procR1.toArray(new TwoStepMasterProcessor[0])).handleEventsWith(matchingEngineHandlers);
+        // procR1.toArray(new TwoStepMasterProcessor[0])    --> convert "List<TwoStepMasterProcessor> procR1" sang một array[TwoStepMasterProcessor]
+//        disruptor.after(procR1.toArray(new TwoStepMasterProcessor[0])).handleEventsWith(matchingEngineHandlers);
 
         // 3. risk release (R2) after matching engine (ME)
         final EventHandlerGroup<OrderCommand> afterMatchingEngine = disruptor.after(matchingEngineHandlers);
