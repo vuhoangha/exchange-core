@@ -484,17 +484,43 @@ public class LoadLoadExample {
 - là cấp độ thông tin cao nhất và thường được sử dụng bởi các nhà giao dịch chuyên nghiệp và tổ chức tài chính.
 - Nó cung cấp toàn bộ thông tin về sâu độ thị trường, bao gồm cả thông tin về lệnh giao dịch ẩn và lệnh giao dịch lớn được ẩn dưới dạng lệnh điều kiện. Điều này giúp nhà giao dịch có cái nhìn chi tiết và toàn diện hơn về hoạt động thị trường.
 
+### SOCKET.IO
+###### Support 3 loại transport
+- HTTP long-polling
+  - Client send req HTTP đến server và server giữ req đến khi có thông tin mới sẵn sàng để gửi trở lại cho client. Sau khi client nhận được phản hồi, nó ngay lập tức gửi một yêu cầu mới trở lại server.
+  - Trong môi trường phân tán nơi có nhiều server thì cần sticky-sessions hoặc cookie gì đó để load-balancer biết được trước đó client đã kết nối tới server cụ thể nào. Điều đó giúp ta biết trạng thái trước đó của client, hạn chế init thêm req mới, giảm độ trễ và tiết kiệm tài nguyên
+- Websocket
+  - Handshake
+    - Client
+      - Client bắt đầu quá trình bằng cách gửi một yêu cầu HTTP/1.1 Upgrade đến server, bao gồm header Upgrade: websocket và Connection: Upgrade để báo cho server biết client muốn nâng cấp từ HTTP sang WebSocket.
+      - Req cũng bao gồm 1 header Sec-WebSocket-Key, là một chuỗi base64 ngẫu nhiên, dùng cho việc xác minh bảo mật.
+    - Server:
+      - Khi nhận được yêu cầu Upgrade, server kiểm tra xem yêu cầu có hợp lệ không. Nếu hợp lệ, server sẽ gửi lại một phản hồi HTTP/1.1 101 Switching Protocols.
+      - Phản hồi bao gồm header Upgrade: websocket, Connection: Upgrade, và Sec-WebSocket-Accept, giá trị của nó được tính từ Sec-WebSocket-Key của yêu cầu và một chuỗi đặc biệt, sau đó được mã hóa SHA-1 và mã hóa base64.
+  - Sau khi handshake thành công, client và server sẽ giao tiếp với nhau qua 1 req duy nhất chính là req Upgrade lúc đầu
+- Webtransport
+###### Tính năng
+- HTTP long-polling fallback
+  - Trong trường hợp trình duyệt/ thiết bị ko hỗ trợ Websocket, Socket.io sẽ tự động chuyển kết nối sang loại Http Long Polling
+- Automatic reconnection
+  - Kêt nối Websocket giữa client và server có thể bị gián đoạn mà cả 2 đều ko biết trạng thái kết nối
+  - Socket.io sử dụng heartbeat để định kì kiểm tra lại trạng thái connect
+  - Nếu bị ngắt kết nối, client sẽ tự connect lại nhưng time lùi dần theo cấp số nhân. Ví dụ lần đầu, nó sẽ thử lại sau 1s, nếu ko đc thì lần sau 2s, 4s, 8s hoặc random time. Tới 1 giới hạn nhất định thì nó sẽ ngừng ko thử lại nữa. Điều này làm giảm áp lực reconnect lên server trong trường hợp có sự cố
+- Packet buffering (Đưa gói tin vào bộ đệm)
+  - Mặc định, bất kỳ msg nào được send khi Socket không kết nối sẽ lưu vào bộ đệm và sẽ gửi đi khi kết nối lại.
+  - Socket.io-client
+    - Lưu ý msg chỉ được lưu sau khi socket.io nhận thấy connect bị gián đoạn và phát ra event 'disconnect'. Các msg gửi đi từ lúc connect bắt đầu bị gián đoạn tới khi socket.io phát hiện ra sẽ bị mất.
+    - Muốn msg ko lưu vào buffer mà chỉ gửi xong quên (tương tự UDP), có thể check socket.connected mới gửi hoặc dùng socket.volatile
+  - Socket.io trên server thì có vẻ ko cần, vì khi đã có event 'disconnect' đồng nghĩa connect đã bị close. Client khi đó mở connect mới và nó ko cần msg của connect cũ nữa (thực ra cũng rất khó biết connect nào cũ)
+- Acknowledgements
+  - Cho phép người gửi biết được người nhận đã thực sự nhận được chưa
+- Broadcasting
+  - Cho phép gửi msg tới tất cả client
+  - Tới nhiều namespace
+  - Tới 1 hoặc nhiều room
+  - Tới các room trừ 1 số room chỉ định
+- Multiplexing
+  - Cho phép nhiều namespace cùng sử dụng chung 1 connection
 
 
-Công ty tôi đang muốn xây dựng 1 sàn giao dịch crypto và tôi đang nghiên cứu các công nghệ cần thiết cho việc đó. Tôi rất ấn tượng với
-hiệu suất mà Chronicle Queue đạt được. Nhưng tôi vẫn có một vài thắc mắc về Chronicle Queue Enterprise:
-
-1. Chronicle Queue Enterprise có thể sử dụng trên nhiều VM và chúng giao tiếp với nhau qua TCP/UDP, vậy chúng có Master/Slave không? Giả sử service_A chạy trên VM_A, service_B chạy trên VM_B thì chúng có thể cùng ghi vào 1 queue được không?
-2. Giả sử mạng kết nối giữa 2 VM bị tắc nghẽn, cả 2 cùng ghi vào 1 queue thì Chronicle Queue sẽ merge các dữ liệu này lại như nào, hay là chỉ lấy 1 trong 2 và đồng bộ VM còn lại
-3. Khi tôi muốn thêm 1 service_C trên VM_C vào Chronicle Queue và tôi chỉ quan tâm đến Queue_X thì các queue khác không cần thiết như Queue_A, Queue_B có bị đồng bộ sang VM_C không? Và nếu đồng bộ tất thì việc này có diễn ra lâu không? Tôi quan tâm chỉ vì tôi muốn xây dựng các microservice triển khai trên Kubernetes có thể auto scaling khi cần, chỉ đọc dữ liệu từ Chronicle Queue và phản hồi về cho user.
-4. Việc thiết lập Chronicle Queue Enterprise có đơn giản không? VM_A với 1 IP và folder cụ thể, tương tự với VM_B phải không? Và liệu việc sử dụng nó trên Kubernetes có khả thi không?
-
-Sau cùng, xin lỗi vì khả năng nghe, nói tiếng Anh của tôi không được tốt, vậy nên tôi nghĩ sẽ tốt hơn nếu chúng ta trao đổi qua các kênh chat như Whatapps, Telegram.
-
-Whatapps: +84 96 209 54 92
-Telegram: @havu1095
+        đang dở ở đây nha
