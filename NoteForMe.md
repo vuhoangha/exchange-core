@@ -521,6 +521,31 @@ public class LoadLoadExample {
   - Tới các room trừ 1 số room chỉ định
 - Multiplexing
   - Cho phép nhiều namespace cùng sử dụng chung 1 connection
+###### [Connection State Recovery](https://socket.io/docs/v4/connection-state-recovery)
+###### μWebSockets.js
+- Mặc định Socket.io server đang sử dụng thư viện "ws" nhưng có thể tùy chỉnh sử dụng các thư viện khác
+  - https://socket.io/docs/v4/memory-usage/
+  - https://socket.io/docs/v4/server-installation/#other-websocket-server-implementations
+  - https://socket.io/blog/socket-io-4-4-0/
+  - https://stackoverflow.com/questions/74154512/socket-io-performance-optimisation-15000-users
+  - https://github.com/socketio/engine.io/issues/578
+###### Authen & Cookie
+- https://socket.io/get-started/private-messaging-part-2/
+- https://socket.io/how-to/deal-with-cookies
+- https://socket.io/how-to/use-with-express-session
+- [Client send credentials](https://socket.io/docs/v4/middlewares/#sending-credentials)
+- [Chỉ authen lúc handshake](https://socket.io/docs/v4/middlewares/#compatibility-with-express-middleware)
+- [Emit tới tất cả các tab/device của user](https://socket.io/docs/v4/rooms/#sample-use-cases)
+###### Các case đặc biệt cần handle
+- [Important note: the Socket instance is not actually connected when the middleware gets executed, which means that no event will be emitted if the connection eventually fails.disconnect](https://socket.io/docs/v4/middlewares/)
+###### Socket.io Adapter
+- [Redis Adapter](https://socket.io/docs/v4/redis-adapter/)
+  - Sử dụng cơ chế PUB/SUB của Redis
+  - Ko store lại data vào Redis
+  - Khi Redis down, các msg sẽ chỉ gửi tới các client ở cùng server với socket.io server
+  - [Một server khác có thể gửi msg tới client thông qua "Redis emitter"](https://socket.io/docs/v4/redis-adapter/#emitter)
+- [Redis Streams adapter](https://socket.io/docs/v4/redis-streams-adapter/)
+  - 
 
-
-        đang dở ở đây nha
+              
+                đang xem dở Redis Stream
