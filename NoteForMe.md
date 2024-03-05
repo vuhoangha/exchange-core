@@ -545,7 +545,11 @@ public class LoadLoadExample {
   - Khi Redis down, các msg sẽ chỉ gửi tới các client ở cùng server với socket.io server
   - [Một server khác có thể gửi msg tới client thông qua "Redis emitter"](https://socket.io/docs/v4/redis-adapter/#emitter)
 - [Redis Streams adapter](https://socket.io/docs/v4/redis-streams-adapter/)
+  - Sử dụng Redis Streams vừa có streaming data vừa có persistent các trạng thái + msg gửi đi
+  - Nếu user bị ngắt kết nối, khi kết nối lại nó sẽ có thông tin cache lại từ trước
+  - Msg gửi đi ko thành công sẽ được persistent để gửi lại
+- [MongoDB Adapter](https://socket.io/docs/v4/mongo-adapter/)
   - 
-
-              
-                đang xem dở Redis Stream
+- [Postgres Adapter](https://socket.io/docs/v4/postgres-adapter/)
+  - Hoạt động dựa trên command NOTIFY và LISTEN
+  - Cũng có emiiter riêng để server khác publish dữ liệu cho client
