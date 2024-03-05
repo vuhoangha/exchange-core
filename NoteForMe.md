@@ -549,7 +549,27 @@ public class LoadLoadExample {
   - Nếu user bị ngắt kết nối, khi kết nối lại nó sẽ có thông tin cache lại từ trước
   - Msg gửi đi ko thành công sẽ được persistent để gửi lại
 - [MongoDB Adapter](https://socket.io/docs/v4/mongo-adapter/)
-  - 
+  - Sử dụng [Change Streams](https://viblo.asia/p/change-streams-trong-mongodb-Ljy5V7y3Kra) của MongoDB
+  - Sử dụng Capped Collections để giới hạn kích thước của collection, nó sẽ giống 1 bộ đệm tròn, sẽ tự ghi đè vào cái cũ nhất nếu đã đầy
+  - Sử dụng TTL Indexes để đánh dấu thời hạn cho 1 row, khi hết thời hạn này thì bản ghi sẽ bị xóa
+  - Cũng có emiiter riêng để server khác publish dữ liệu cho client
 - [Postgres Adapter](https://socket.io/docs/v4/postgres-adapter/)
   - Hoạt động dựa trên command NOTIFY và LISTEN
   - Cũng có emiiter riêng để server khác publish dữ liệu cho client
+
+- Việc cần làm để cải thiện performance
+  - Lựa chọn xem socket.io server base trên cái nào
+    - https://socket.io/docs/v4/memory-usage/
+  - Sử dụng Middlewares sao cho ít cản trở nhất khi gửi/nhận msg
+  - Lựa chọn adapter nào để cho performance tốt nhất
+    - https://socket.io/docs/v4/adapter/
+  - Lựa chọn Custom parser nào để gói tin nhỏ, nhẹ nhất
+    - https://socket.io/docs/v4/socket-io-protocol/#packet-encoding
+    - https://socket.io/docs/v4/custom-parser/#the-msgpack-parser
+    - Issue:
+      - https://github.com/socketio/socket.io/issues?q=is%3Aissue+msgpack
+      - https://github.com/socketio/socket.io/issues/4660
+      - https://github.com/socketio/socket.io/pull/4675
+  - Bật/tắt req Http init ban đầu
+  - [Chỉnh sửa cấu hình máy chủ như số lượng connection tối đa, số port tối đa](https://socket.io/docs/v4/performance-tuning/#at-the-os-level)
+  - [Tham khảo cả từ thư viện của ws](https://github.com/websockets/ws/#opt-in-for-performance-and-spec-compliance)
