@@ -224,6 +224,7 @@ public final class OrderBookNaiveImpl implements IOrderBook {
 
 //        log.info("matchInstantly: {} {}", order, matchingBuckets);
 
+        // bucket trống (orderbook trống) thì trả ra khối lượng khớp ban đầu
         if (matchingBuckets.size() == 0) {
             return filled;
         }

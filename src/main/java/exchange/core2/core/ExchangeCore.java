@@ -192,7 +192,7 @@ public final class ExchangeCore {
                 }));
 
         // procR1.toArray(new TwoStepMasterProcessor[0])    --> convert "List<TwoStepMasterProcessor> procR1" sang một array[TwoStepMasterProcessor]
-//        disruptor.after(procR1.toArray(new TwoStepMasterProcessor[0])).handleEventsWith(matchingEngineHandlers);
+        disruptor.after(procR1.toArray(new TwoStepMasterProcessor[0])).handleEventsWith(matchingEngineHandlers);
 
         // 3. risk release (R2) after matching engine (ME)
         final EventHandlerGroup<OrderCommand> afterMatchingEngine = disruptor.after(matchingEngineHandlers);

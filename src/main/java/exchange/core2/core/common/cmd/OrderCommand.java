@@ -39,7 +39,7 @@ public final class OrderCommand implements IOrder {
     public long price;
 
     @Getter
-    public long size;
+    public long size;   // kích cỡ lệnh theo lot
 
     @Getter
     // new orders INPUT - reserved price for fast moves of GTC bid orders in exchange mode
