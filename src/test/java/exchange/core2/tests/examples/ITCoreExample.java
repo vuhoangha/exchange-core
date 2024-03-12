@@ -98,7 +98,6 @@ public class ITCoreExample {
         future = api.submitCommandAsync(ApiAddUser.builder()
                 .uid(301L)
                 .build());
-
         System.out.println("ApiAddUser 1 result: " + future.get());
 
 
@@ -106,7 +105,6 @@ public class ITCoreExample {
         future = api.submitCommandAsync(ApiAddUser.builder()
                 .uid(302L)
                 .build());
-
         System.out.println("ApiAddUser 2 result: " + future.get());
 
         // first user deposits 20 LTC
@@ -116,7 +114,6 @@ public class ITCoreExample {
                 .amount(2_000_000_000L)
                 .transactionId(1L)
                 .build());
-
         System.out.println("ApiAdjustUserBalance 1 result: " + future.get());
 
 
@@ -127,7 +124,6 @@ public class ITCoreExample {
                 .amount(10_000_000L)
                 .transactionId(2L)
                 .build());
-
         System.out.println("ApiAdjustUserBalance 2 result: " + future.get());
 
 
@@ -144,8 +140,20 @@ public class ITCoreExample {
                 .orderType(OrderType.GTC) // Good-till-Cancel
                 .symbol(symbolXbtLtc)
                 .build());
-
         System.out.println("ApiPlaceOrder 1 result: " + future.get());
+
+        // second user places Immediate-or-Cancel Ask (Sell) order
+        // he assumes wost rate to sell 152.5 LTC for 1 BTC
+        future = api.submitCommandAsync(ApiPlaceOrder.builder()
+                .uid(302L)
+                .orderId(5002L)
+                .price(15_250L)
+                .size(10L) // order size is 10 lots
+                .action(OrderAction.ASK)
+                .orderType(OrderType.IOC) // Immediate-or-Cancel
+                .symbol(symbolXbtLtc)
+                .build());
+        System.out.println("ApiPlaceOrder 2 result: " + future.get());
 
         System.out.println("Haha");
     }

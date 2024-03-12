@@ -35,10 +35,8 @@ import exchange.core2.core.processors.journaling.ISerializationProcessor;
 import lombok.Builder;
 import lombok.extern.slf4j.Slf4j;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
+import java.text.MessageFormat;
+import java.util.*;
 import java.util.concurrent.*;
 import java.util.function.ObjLongConsumer;
 import java.util.stream.Collectors;
@@ -105,6 +103,7 @@ public final class ExchangeCore {
         // OrderBookNaiveImpl || OrderBookDirectImpl
         final IOrderBook.OrderBookFactory orderBookFactory = perfCfg.getOrderBookFactory();
 
+        // lay so luong matching engine va risk engine can chay
         final int matchingEnginesNum = perfCfg.getMatchingEnginesNum();
         final int riskEnginesNum = perfCfg.getRiskEnginesNum();
 
@@ -117,10 +116,9 @@ public final class ExchangeCore {
         final int chainLength = EVENTS_POOLING ? 1024 : 1;
         final SharedPool sharedPool = new SharedPool(poolInitialSize * 4, poolInitialSize, chainLength);
 
-        // creating and attaching exceptions handler
+        // handler exception cua disruptor
         final DisruptorExceptionHandler<OrderCommand> exceptionHandler = new DisruptorExceptionHandler<>("main", (ex, seq) -> {
             log.error("Exception thrown on sequence={}", seq, ex);
-            // TODO re-throw exception on publishing
             ringBuffer.publishEvent(SHUTDOWN_SIGNAL_TRANSLATOR);
             disruptor.shutdown();
         });
@@ -154,6 +152,7 @@ public final class ExchangeCore {
                                 loaderExecutor)));
 
         // tạo các matching_engine_handler từ function "MatchingEngineRouter.processOrder"
+        // nghia la disruptor sau khi nhan duoc 1 msg trong ring buffer se dung thang MatchingEngineRouter.processOrder xu ly
         final EventHandler<OrderCommand>[] matchingEngineHandlers = matchingEngineFutures.values().stream()
                 .map(CompletableFuture::join)   // thực hiện các task tạo matching_engine phía trên
                 .map(mer -> (EventHandler<OrderCommand>) (cmd, seq, eob) -> mer.processOrder(seq, cmd)) // tạo các handler từ matching_engine phía trên
@@ -177,16 +176,17 @@ public final class ExchangeCore {
         // 2. [journaling (J)] in parallel with risk hold (R1) + matching engine (ME)
         // ghi log sau khi GroupingProcessor hoàn thành
         boolean enableJournaling = serializationCfg.isEnableJournaling();
-        final EventHandler<OrderCommand> jh = enableJournaling ? serializationProcessor::writeToJournal : null;
+        final EventHandler<OrderCommand> journalingHandler = enableJournaling ? serializationProcessor::writeToJournal : null;
         if (enableJournaling) {
-            // hàm này sẽ add 'jh' thực hiện sau khi 'GroupingProcessor' hoàn thành
-            afterGrouping.handleEventsWith(jh);
+            // hàm này sẽ add 'journalingHandler' thực hiện sau khi 'GroupingProcessor' hoàn thành
+            afterGrouping.handleEventsWith(journalingHandler);
         }
+        afterGrouping.handleEventsWith(this::writelog);
 
         // chạy sau khi GroupingProcessor hoàn thành và song song với việc ghi log
         riskEngines.forEach((idx, riskEngine) -> afterGrouping.handleEventsWith(
-                (rb, bs) -> {
-                    final TwoStepMasterProcessor r1 = new TwoStepMasterProcessor(rb, rb.newBarrier(bs), riskEngine::preProcessCommand, exceptionHandler, coreWaitStrategy, "R1_" + idx);
+                (_ringBuffer, _sequence) -> {
+                    final TwoStepMasterProcessor r1 = new TwoStepMasterProcessor(_ringBuffer, _ringBuffer.newBarrier(_sequence), riskEngine::preProcessCommand, exceptionHandler, coreWaitStrategy, "R1_" + idx);
                     procR1.add(r1);
                     return r1;
                 }));
@@ -207,7 +207,7 @@ public final class ExchangeCore {
 
         // 4. results handler (E) after matching engine (ME) + [journaling (J)]
         final EventHandlerGroup<OrderCommand> mainHandlerGroup = enableJournaling
-                ? disruptor.after(arraysAddHandler(matchingEngineHandlers, jh))
+                ? disruptor.after(arraysAddHandler(matchingEngineHandlers, journalingHandler))
                 : afterMatchingEngine;
 
         final ResultsHandler resultsHandler = new ResultsHandler(resultsConsumer);
@@ -226,6 +226,13 @@ public final class ExchangeCore {
         } catch (InterruptedException ex) {
             throw new RuntimeException(ex);
         }
+    }
+
+    public void writelog(OrderCommand cmd, long dSeq, boolean eob){
+        try{
+//            Thread.sleep(500);
+            log.info(MessageFormat.format("Writelog - cmd: {0}, dSeq: {1}, eob: {2}",  cmd.toString(), dSeq, eob));
+        }catch (Exception ex){}
     }
 
     public synchronized void startup() {

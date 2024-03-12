@@ -24,6 +24,7 @@ import exchange.core2.core.common.cmd.OrderCommandType;
 import exchange.core2.core.common.config.PerformanceConfiguration;
 import lombok.extern.slf4j.Slf4j;
 
+import java.util.Date;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static exchange.core2.core.ExchangeCore.EVENTS_POOLING;
@@ -150,6 +151,8 @@ public final class GroupingProcessor implements EventProcessor {
             try {
                 // consumer chờ đợi 'nextSequence', sau khi hàm này xong thì 'availableSequence' đã chính thức có mặt trong ring_buffer
                 long availableSequence = waitSpinningHelper.tryWaitFor(nextSequence);
+
+                log.info("GroupingProcessor.processEvents");
 
                 /*
                  * xử lý lần lượt các event từ 'nextSequence' --> 'availableSequence'

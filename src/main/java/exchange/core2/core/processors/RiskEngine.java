@@ -47,6 +47,8 @@ import org.eclipse.collections.impl.map.mutable.primitive.IntObjectHashMap;
 
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.text.MessageFormat;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Objects;
 import java.util.Optional;
@@ -230,6 +232,12 @@ public final class RiskEngine implements WriteBytesMarshallable {
      * @return true if caller should publish sequence even if batch was not processed yet
      */
     public boolean preProcessCommand(final long seq, final OrderCommand cmd) {
+        log.info(MessageFormat.format("preProcessCommand - seq: {0}, cmd: {1}", seq, cmd.toString()));
+
+        try{
+            Thread.sleep(5000);
+        }catch (Exception ex){}
+
         switch (cmd.command) {
             case MOVE_ORDER:
             case CANCEL_ORDER:
