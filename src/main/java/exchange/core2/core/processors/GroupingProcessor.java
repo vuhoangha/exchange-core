@@ -152,8 +152,6 @@ public final class GroupingProcessor implements EventProcessor {
                 // consumer chờ đợi 'nextSequence', sau khi hàm này xong thì 'availableSequence' đã chính thức có mặt trong ring_buffer
                 long availableSequence = waitSpinningHelper.tryWaitFor(nextSequence);
 
-                log.info("GroupingProcessor.processEvents");
-
                 /*
                  * xử lý lần lượt các event từ 'nextSequence' --> 'availableSequence'
                  * vì trong trường hợp nextSequence < availableSequence thì nghĩa là event 'availableSequence' = nextSequence - 1 ---> đã được consumer xử lý trước đó

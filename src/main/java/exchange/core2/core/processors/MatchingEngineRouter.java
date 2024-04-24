@@ -179,8 +179,6 @@ public final class MatchingEngineRouter implements WriteBytesMarshallable {
 
 
     public void processOrder(long seq, OrderCommand cmd) {
-        log.info(MessageFormat.format("processOrder - seq: {0}, cmd: {1}", seq, cmd.toString()));
-
         final OrderCommandType command = cmd.command;
 
         if (command == OrderCommandType.MOVE_ORDER

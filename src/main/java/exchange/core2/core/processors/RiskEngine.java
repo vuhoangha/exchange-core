@@ -232,12 +232,6 @@ public final class RiskEngine implements WriteBytesMarshallable {
      * @return true if caller should publish sequence even if batch was not processed yet
      */
     public boolean preProcessCommand(final long seq, final OrderCommand cmd) {
-        log.info(MessageFormat.format("preProcessCommand - seq: {0}, cmd: {1}", seq, cmd.toString()));
-
-        try{
-            Thread.sleep(5000);
-        }catch (Exception ex){}
-
         switch (cmd.command) {
             case MOVE_ORDER:
             case CANCEL_ORDER:
