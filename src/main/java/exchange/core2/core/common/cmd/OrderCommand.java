@@ -35,11 +35,13 @@ public final class OrderCommand implements IOrder {
 
     public int symbol;
 
+    // IOC, GTC: giá đặt lệnh
+    // FOK_BUDGET: tổng số tiền mong muốn
     @Getter
     public long price;
 
     @Getter
-    public long size;   // kích cỡ lệnh theo lot
+    public long size;   // kích cỡ lệnh theo lot (ví dụ 1 lot = 0.01 BTC --> size=100 là 1 BTC)
 
     @Getter
     // new orders INPUT - reserved price for fast moves of GTC bid orders in exchange mode

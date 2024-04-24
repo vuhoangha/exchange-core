@@ -36,10 +36,13 @@ public final class UserProfile implements WriteBytesMarshallable, StateHash {
     public final IntObjectHashMap<SymbolPositionRecord> positions;
 
     // protects from double adjustment
+    // 'adjustmentsCounter' tăng dần dùng để kiểm soát thay đổi số dư. Ví dụ mỗi yêu cầu có mã <= 'adjustmentsCounter' hiện tại đều là ko hợp lệ
     public long adjustmentsCounter;
 
     // currency accounts
     // currency -> balance
+    // lưu trữ thông tin số dư của user
+    // { 150: 10 } --> mã ID của BTC = 150, user đang có 10 BTC
     public final IntLongHashMap accounts;
 
     public UserStatus userStatus;

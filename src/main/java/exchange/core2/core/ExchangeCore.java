@@ -171,10 +171,10 @@ public final class ExchangeCore {
         // GroupingProcessor sẽ xử lý data đầu vào từ ring_buffer trước
         final EventHandlerGroup<OrderCommand> afterGrouping =
                 disruptor.handleEventsWith(
-                        (ringBuffer, sequences) -> new GroupingProcessor(ringBuffer, ringBuffer.newBarrier(sequences), perfCfg, coreWaitStrategy, sharedPool));
+                        (_ringBuffer, _sequences) -> new GroupingProcessor(_ringBuffer, _ringBuffer.newBarrier(_sequences), perfCfg, coreWaitStrategy, sharedPool));
 
         // 2. [journaling (J)] in parallel with risk hold (R1) + matching engine (ME)
-        // ghi log sau khi GroupingProcessor hoàn thành
+        // chạy sau GroupingProcessor dùng để ghi log
         boolean enableJournaling = serializationCfg.isEnableJournaling();
         final EventHandler<OrderCommand> journalingHandler = enableJournaling ? serializationProcessor::writeToJournal : null;
         if (enableJournaling) {
@@ -184,6 +184,9 @@ public final class ExchangeCore {
         afterGrouping.handleEventsWith(this::writelog);
 
         // chạy sau khi GroupingProcessor hoàn thành và song song với việc ghi log
+        // nó sử dụng thằng "riskEngine::preProcessCommand" để check xem user có đủ số dư ko, hoặc nếu có margin thì có đang bị quá hạn mức ko
+        // đoạn này có nghĩa là nó chờ thằng "TwoStepMasterProcessor.processEvents", trong thằng ấy nó gọi đến "riskEngine::preProcessCommand"
+        // và sau khi xử lý xong nó publish vào ring_buffer --> call tới step tiếp theo
         riskEngines.forEach((idx, riskEngine) -> afterGrouping.handleEventsWith(
                 (_ringBuffer, _sequence) -> {
                     final TwoStepMasterProcessor r1 = new TwoStepMasterProcessor(_ringBuffer, _ringBuffer.newBarrier(_sequence), riskEngine::preProcessCommand, exceptionHandler, coreWaitStrategy, "R1_" + idx);
@@ -192,14 +195,16 @@ public final class ExchangeCore {
                 }));
 
         // procR1.toArray(new TwoStepMasterProcessor[0])    --> convert "List<TwoStepMasterProcessor> procR1" sang một array[TwoStepMasterProcessor]
+        // chạy sau thằng 'riskEngine::preProcessCommand' sau khi đã check số dư + risk position ngon lành
+        // đoạn này nó sẽ xử lý khớp lệnh thông qua hàm "MatchingEngineRouter.processOrder(seq, cmd)"
         disruptor.after(procR1.toArray(new TwoStepMasterProcessor[0])).handleEventsWith(matchingEngineHandlers);
 
         // 3. risk release (R2) after matching engine (ME)
         final EventHandlerGroup<OrderCommand> afterMatchingEngine = disruptor.after(matchingEngineHandlers);
 
         riskEngines.forEach((idx, riskEngine) -> afterMatchingEngine.handleEventsWith(
-                (rb, bs) -> {
-                    final TwoStepSlaveProcessor r2 = new TwoStepSlaveProcessor(rb, rb.newBarrier(bs), riskEngine::handlerRiskRelease, exceptionHandler, "R2_" + idx);
+                (_ringBuffer, _sequences) -> {
+                    final TwoStepSlaveProcessor r2 = new TwoStepSlaveProcessor(_ringBuffer, _ringBuffer.newBarrier(_sequences), riskEngine::handlerRiskRelease, exceptionHandler, "R2_" + idx);
                     procR2.add(r2);
                     return r2;
                 }));

@@ -37,6 +37,9 @@ public final class CoreArithmeticUtils {
         return size * (priceDiff * spec.quoteScaleK + (spec.takerFee - spec.makerFee));
     }
 
+    // tính tổng chi phí cần thiết cho order này
+    // budgetInSteps: thực ra đây chính là số tiền user mong muốn sử dụng. Kiểu như mua BTC với 100 USDT. Size kia là số lot
+    // giá trị trả ra sẽ là số lượng litoshi
     public static long calculateAmountBidTakerFeeForBudget(long size, long budgetInSteps, CoreSymbolSpecification spec) {
 
         return budgetInSteps * spec.quoteScaleK + size * spec.takerFee;

@@ -281,6 +281,9 @@ Giao dịch BTC/USDT
 #### Extra document
 - [Tài liệu về cách bên Chronicle xây dựng Matching Engine](https://portal.chronicle.software/docs/reports/ChronicleMatchingEngine.pdf)
 - [Giao thức Chronicle FIX](https://chronicle.software/choosing-chronicle-fix-engine/)
+#### Cách cache thông tin user
+- balance: lưu trữ dạng này trong UserProfile "this.accounts = new IntLongHashMap();"
+- trong UserProfile còn chứa cả các position của user khi dùng margin
 
 
 ## [ECLIPSE COLLECTIONS](https://github.com/eclipse/eclipse-collections)
@@ -300,6 +303,7 @@ Giao dịch BTC/USDT
 ## [LMAX DISRUPTOR](https://github.com/LMAX-Exchange/disruptor)
 - [Example 1](https://lmax-exchange.github.io/disruptor/user-guide/index.html)
 - [Wait Strategies](https://lmax-exchange.github.io/disruptor/user-guide/index.html#_alternative_wait_strategies)
+    - Wait Strategies: được áp dụng cho cách lắng nghe để lấy event của consumer. Producer cũng có cách riêng để chờ lấy sequence mới nếu ring_buffer đang đầy nhưng cái này thì tôi chưa tìm hiểu.
     - SleepingWaitStrategy
         - Sử dụng 1 vòng lặp đơn giản, sử dụng LockSupport.parkNanos(1) trong vòng lặp để pause Thread lại 1 khoảng thời gian
         - Độ trễ trung bình để giữa producer và consumer sẽ cao hơn
@@ -573,3 +577,4 @@ public class LoadLoadExample {
   - Bật/tắt req Http init ban đầu
   - [Chỉnh sửa cấu hình máy chủ như số lượng connection tối đa, số port tối đa](https://socket.io/docs/v4/performance-tuning/#at-the-os-level)
   - [Tham khảo cả từ thư viện của ws](https://github.com/websockets/ws/#opt-in-for-performance-and-spec-compliance)
+- [Ưu điểm mô hình chỉ 1 writer](https://mechanical-sympathy.blogspot.com/2011/09/single-writer-principle.html)
